@@ -1,0 +1,37 @@
+[
+  {
+    "objectID": "posts/welcome/index.html",
+    "href": "posts/welcome/index.html",
+    "title": "Welcome To My Blog",
+    "section": "",
+    "text": "This is the first post in a Quarto blog. Welcome!\n\nSince this post doesn’t specify an explicit image, the first image in the post will be used in the listing page of posts."
+  },
+  {
+    "objectID": "posts/Hoops/index.html",
+    "href": "posts/Hoops/index.html",
+    "title": "We’re Playing Basketball",
+    "section": "",
+    "text": "This is a post for my basketball post!"
+  },
+  {
+    "objectID": "about.html",
+    "href": "about.html",
+    "title": "About",
+    "section": "",
+    "text": "Hello everyone! My name is Sameer Sapre and I am an analyst working in the Baseball Projects group with the Seattle Mariners.\nI am also currently a graduate student at the University of Washington studying Industrial Engineering.\nIn my free time, I enjoy playing new sports, hiking, and cooking with friends.\nOutside of work and school I am a volunteer usher with Seattle Thetre Group and am the VP of Public Relationships for my local Toastmaster’s chapter."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Sameer’s Blog",
+    "section": "",
+    "text": "We’re Playing Basketball\n\n\n\n\n\n\nNBA\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nMay 16, 2024\n\n\nSameer Sapre\n\n\n\n\n\n\n\n\n\n\n\n\nPost With Code\n\n\n\n\n\n\nnews\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nMay 16, 2024\n\n\nHarlow Malloc\n\n\n\n\n\n\n\n\n\n\n\n\nWelcome To My Blog\n\n\n\n\n\n\nnews\n\n\n\n\n\n\n\n\n\nMay 13, 2024\n\n\nTristan O’Malley\n\n\n\n\n\n\nNo matching items"
+  },
+  {
+    "objectID": "posts/post-with-code/index.html",
+    "href": "posts/post-with-code/index.html",
+    "title": "Post With Code",
+    "section": "",
+    "text": "This is a post with executable code."
+  }
+]
