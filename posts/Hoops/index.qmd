@@ -1,0 +1,9 @@
+---
+title: "We're Playing Basketball"
+author: "Sameer Sapre"
+date: "2024-05-16"
+categories: [NBA, code, analysis]
+image: "image.jpg"
+---
+
+This is a post for my basketball post!
