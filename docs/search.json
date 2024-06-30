@@ -25,7 +25,14 @@
     "href": "index.html",
     "title": "Sameer’s Blog",
     "section": "",
-    "text": "We’re Playing Basketball\n\n\n\n\n\n\nNBA\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nMay 16, 2024\n\n\nSameer Sapre\n\n\n\n\n\n\n\n\n\n\n\n\nPost With Code\n\n\n\n\n\n\nnews\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nMay 16, 2024\n\n\nHarlow Malloc\n\n\n\n\n\n\n\n\n\n\n\n\nWelcome To My Blog\n\n\n\n\n\n\nnews\n\n\n\n\n\n\n\n\n\nMay 13, 2024\n\n\nTristan O’Malley\n\n\n\n\n\n\nNo matching items"
+    "text": "Predicting NFL Game Outcomes with nflfastR\n\n\n\n\n\n\nnews\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nJun 30, 2024\n\n\nSameer Sapre\n\n\n\n\n\n\n\n\n\n\n\n\nWe’re Playing Basketball\n\n\n\n\n\n\nNBA\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nMay 16, 2024\n\n\nSameer Sapre\n\n\n\n\n\n\n\n\n\n\n\n\nPost With Code\n\n\n\n\n\n\nnews\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nMay 16, 2024\n\n\nHarlow Malloc\n\n\n\n\n\n\n\n\n\n\n\n\nWelcome To My Blog\n\n\n\n\n\n\nnews\n\n\n\n\n\n\n\n\n\nMay 13, 2024\n\n\nTristan O’Malley\n\n\n\n\n\n\nNo matching items"
+  },
+  {
+    "objectID": "posts/nfl-game-prediction/index.html",
+    "href": "posts/nfl-game-prediction/index.html",
+    "title": "Predicting NFL Game Outcomes with nflfastR",
+    "section": "",
+    "text": "Hello everyone! Today I want to share a quick tutorial on using nflreadR to build a simple game outcome model.\nFirst, a quick introduction of nflreadR - it’s part of the nflverse family of packages in R that all easily and efficiently obtaining data from NFL games. In this post, we’ll be using its suite of functions to get the data we need to build a predictive model.\n\n# install and load packages\n#install.packages(\"nflreadr\")\nlibrary(nflreadr)"
   },
   {
     "objectID": "posts/post-with-code/index.html",

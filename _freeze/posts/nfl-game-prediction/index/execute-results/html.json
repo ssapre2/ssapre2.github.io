@@ -1,0 +1,15 @@
+{
+  "hash": "7aa3689ae979d7b6c37992f9132d1510",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"Predicting NFL Game Outcomes with nflfastR\"\nauthor: \"Harlow Malloc\"\ndate: \"2024-06-30\"\ncategories: [news, code, analysis]\nimage: \"nflfastR.png\"\n---\n\n\nHello everyone! Today I want to share a quick tutorial on using `nflreadR` to build a simple game outcome model.\n\nFirst, a quick introduction of `nflreadR` - it's part of the `nflverse` family of packages in R that all easily and efficiently obtaining data from NFL games. In this post, we'll be using its suite of functions to get the data we need to build a predictive model. \n\n\n\n::: {.cell}\n\n```{.r .cell-code}\n# install and load packages\n#install.packages(\"nflreadr\")\nlibrary(nflreadr)\n```\n:::\n",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}

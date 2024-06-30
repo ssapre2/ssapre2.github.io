@@ -13,5 +13,14 @@
   },
   "posts/Hoops/index.qmd": {
     "index.html": "3ca0c90a"
+  },
+  "posts/nfl-game-prediction/index.qmd": {
+    "index.html": "1e6dc425"
+  },
+  "posts/nfl-game-prediction/nfl_matchup_model.qmd": {
+    "nfl_matchup_model.html": "ba852aa5"
+  },
+  "posts/post-with-code/nfl_matchup_model.qmd": {
+    "nfl_matchup_model.html": "113bb7c0"
   }
 }

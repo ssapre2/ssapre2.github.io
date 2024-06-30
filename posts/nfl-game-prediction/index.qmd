@@ -1,0 +1,35 @@
+---
+title: "Predicting NFL Game Outcomes with nflfastR"
+author: "Sameer Sapre"
+date: "2024-06-30"
+categories: [news, code, analysis]
+image: "nflfastR.png"
+---
+
+## Intro
+
+Hello everyone! Today I want to share a quick tutorial on using `nflreadR` to build a simple game outcome model.
+
+First, a quick introduction of `nflreadR` - it's part of the `nflverse` family of packages in R that all easily and efficiently obtaining data from NFL games. In this post, we'll be using its suite of functions to get the data we need to build a predictive model.
+
+First, let's load in some important packages. We'll load in the `tidyverse` for data cleaning and manipulation. The `caret` and `lme4` packages for our model-building.
+
+```{r}
+# install and load packages
+#install.packages("nflreadr")
+library('nflreadr')
+library('lme4')
+library('caret')
+library("tidyverse")
+library('pROC')
+
+```
+
+## Load Data
+
+Now that we have the relevant packages loaded, let's get started getting our data together. Starting with game data, we'll pull game results from 2011 - 2021
+
+```{r}
+# Scrape schedule Results
+load_schedules(seasons = seq(2011,2021)) -> nfl_game_results
+```
