@@ -32,7 +32,7 @@
     "href": "posts/nfl-game-prediction/index.html",
     "title": "Predicting NFL Game Outcomes with nflfastR",
     "section": "",
-    "text": "Hello everyone! Today I want to share a quick tutorial on using nflreadR to build a simple game outcome model.\nFirst, a quick introduction of nflreadR - it’s part of the nflverse family of packages in R that all easily and efficiently obtaining data from NFL games. In this post, we’ll be using its suite of functions to get the data we need to build a predictive model.\n\n# install and load packages\n#install.packages(\"nflreadr\")\nlibrary(nflreadr)"
+    "text": "Hello everyone! Today I want to share a quick tutorial on using nflreadR to build a simple game outcome model.\nFirst, a quick introduction of nflreadR - it’s part of the nflverse family of packages in R that all easily and efficiently obtaining data from NFL games. In this post, we’ll be using its suite of functions to get the data we need to build a predictive model.\nFirst, let’s load in some important packages. We’ll load in the tidyverse for data cleaning and manipulation. The caret and lme4 packages for our model-building.\n\n# install and load packages\n#install.packages(\"nflreadr\")\nlibrary('nflreadr')\nlibrary('lme4')\nlibrary('caret')\nlibrary(\"tidyverse\")\nlibrary('pROC')"
   },
   {
     "objectID": "posts/post-with-code/index.html",
@@ -40,5 +40,19 @@
     "title": "Post With Code",
     "section": "",
     "text": "This is a post with executable code."
+  },
+  {
+    "objectID": "posts/nfl-game-prediction/index.html#intro",
+    "href": "posts/nfl-game-prediction/index.html#intro",
+    "title": "Predicting NFL Game Outcomes with nflfastR",
+    "section": "",
+    "text": "Hello everyone! Today I want to share a quick tutorial on using nflreadR to build a simple game outcome model.\nFirst, a quick introduction of nflreadR - it’s part of the nflverse family of packages in R that all easily and efficiently obtaining data from NFL games. In this post, we’ll be using its suite of functions to get the data we need to build a predictive model.\nFirst, let’s load in some important packages. We’ll load in the tidyverse for data cleaning and manipulation. The caret and lme4 packages for our model-building.\n\n# install and load packages\n#install.packages(\"nflreadr\")\nlibrary('nflreadr')\nlibrary('lme4')\nlibrary('caret')\nlibrary(\"tidyverse\")\nlibrary('pROC')"
+  },
+  {
+    "objectID": "posts/nfl-game-prediction/index.html#load-data",
+    "href": "posts/nfl-game-prediction/index.html#load-data",
+    "title": "Predicting NFL Game Outcomes with nflfastR",
+    "section": "Load Data",
+    "text": "Load Data\nNow that we have the relevant packages loaded, let’s get started getting our data together. Starting with game data, we’ll pull game results from 2011 - 2021\n\n# Scrape schedule Results\nload_schedules(seasons = seq(2011,2021)) -&gt; nfl_game_results \nhead(nfl_game_results)\n\n# A tibble: 6 × 46\n  game_id   season game_type  week gameday weekday gametime away_team away_score\n  &lt;chr&gt;      &lt;int&gt; &lt;chr&gt;     &lt;int&gt; &lt;chr&gt;   &lt;chr&gt;   &lt;chr&gt;    &lt;chr&gt;          &lt;int&gt;\n1 2011_01_…   2011 REG           1 2011-0… Thursd… 20:30    NO                34\n2 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    PIT                7\n3 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    ATL               12\n4 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    CIN               27\n5 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    IND                7\n6 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    TEN               14\n# ℹ 37 more variables: home_team &lt;chr&gt;, home_score &lt;int&gt;, location &lt;chr&gt;,\n#   result &lt;int&gt;, total &lt;int&gt;, overtime &lt;int&gt;, old_game_id &lt;chr&gt;, gsis &lt;int&gt;,\n#   nfl_detail_id &lt;chr&gt;, pfr &lt;chr&gt;, pff &lt;int&gt;, espn &lt;chr&gt;, ftn &lt;int&gt;,\n#   away_rest &lt;int&gt;, home_rest &lt;int&gt;, away_moneyline &lt;int&gt;,\n#   home_moneyline &lt;int&gt;, spread_line &lt;dbl&gt;, away_spread_odds &lt;int&gt;,\n#   home_spread_odds &lt;int&gt;, total_line &lt;dbl&gt;, under_odds &lt;int&gt;,\n#   over_odds &lt;int&gt;, div_game &lt;int&gt;, roof &lt;chr&gt;, surface &lt;chr&gt;, temp &lt;int&gt;, …\n\n\nWe’ve loaded our schedules in with some interesting variables to use in our model. However, it’s not quite in the format we need it to be. Ideally, we’d like to feed in 2 games and have the model give us a winner.\n\nnfl_game_results %&gt;%\n  pivot_longer(cols = c(away_team,home_team),\n               names_to = \"home_away\",\n               values_to = \"team\") %&gt;%\n  mutate(team_score = ifelse(home_away == \"home_team\",yes = home_score,no = away_score),\n         opp_score = ifelse(home_away == \"home_team\", away_score,home_score)) %&gt;%  # sort for cumulative avg\n  arrange(season,week) %&gt;%\n  select(season,game_id,team,team_score,opp_score) -&gt; team_games\n\nLet’s use pivot_longer() to rearrange our dataset to make our dataset look like a"
   }
 ]

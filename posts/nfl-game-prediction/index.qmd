@@ -4,6 +4,9 @@ author: "Sameer Sapre"
 date: "2024-06-30"
 categories: [news, code, analysis]
 image: "nflfastR.png"
+execute: 
+  warning: false
+  
 ---
 
 ## Intro
@@ -31,5 +34,41 @@ Now that we have the relevant packages loaded, let's get started getting our dat
 
 ```{r}
 # Scrape schedule Results
-load_schedules(seasons = seq(2011,2021)) -> nfl_game_results
+load_schedules(seasons = seq(2011,2021)) -> nfl_game_results 
+head(nfl_game_results)
 ```
+
+
+We've loaded our schedules in with some interesting variables to use in our model. However, it's not quite in the format we need it to be. Ideally, we'd like to feed in 2 games and have the model give us a winner.
+
+```{r}
+nfl_game_results %>%
+  pivot_longer(cols = c(away_team,home_team),
+               names_to = "home_away",
+               values_to = "team") %>%
+  mutate(team_score = ifelse(home_away == "home_team",yes = home_score,no = away_score),
+         opp_score = ifelse(home_away == "home_team", away_score,home_score)) %>%  # sort for cumulative avg
+  arrange(season,week) %>%
+  select(season,game_id,team,team_score,opp_score) -> team_games
+```
+
+Let's use `pivot_longer()` to rearrange our dataset and select some simple variables before making the matchup set.
+
+Then, we'll create some features measuring cumalitve and scores
+
+```{r}
+team_games %>%
+  group_by(season,team) %>%
+  mutate(cum_score_mean = cummean(team_score),
+          cum_score_opp = cummean(opp_score),
+          cum_wins = cumsum(team_score > opp_score),
+          cum_losses = cumsum(team_score < opp_score),
+          cum_ties = cumsum(team_score == opp_score),
+         cum_win_pct = cum_wins / (cum_wins + cum_losses),
+         cum_win_pct_lag = lag(cum_win_pct,1),
+         cum_score_lag_1 = lag(cum_score_mean,1),
+         cum_opp_lag_1 = lag(cum_score_opp,1)
+         ) %>%
+  ungroup() -> cum_avgs
+```
+

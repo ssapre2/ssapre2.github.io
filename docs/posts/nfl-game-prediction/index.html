@@ -6,7 +6,7 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
-<meta name="author" content="Harlow Malloc">
+<meta name="author" content="Sameer Sapre">
 <meta name="dcterms.date" content="2024-06-30">
 
 <title>blog_project - Predicting NFL Game Outcomes with nflfastR</title>
@@ -164,7 +164,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div>
       <div class="quarto-title-meta-heading">Author</div>
       <div class="quarto-title-meta-contents">
-               <p>Harlow Malloc </p>
+               <p>Sameer Sapre </p>
             </div>
     </div>
       
@@ -190,15 +190,62 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 
 
+<section id="intro" class="level2">
+<h2 class="anchored" data-anchor-id="intro">Intro</h2>
 <p>Hello everyone! Today I want to share a quick tutorial on using <code>nflreadR</code> to build a simple game outcome model.</p>
 <p>First, a quick introduction of <code>nflreadR</code> - it’s part of the <code>nflverse</code> family of packages in R that all easily and efficiently obtaining data from NFL games. In this post, we’ll be using its suite of functions to get the data we need to build a predictive model.</p>
+<p>First, let’s load in some important packages. We’ll load in the <code>tidyverse</code> for data cleaning and manipulation. The <code>caret</code> and <code>lme4</code> packages for our model-building.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="co"># install and load packages</span></span>
 <span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="co">#install.packages("nflreadr")</span></span>
-<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(nflreadr)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">'nflreadr'</span>)</span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">'lme4'</span>)</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">'caret'</span>)</span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">"tidyverse"</span>)</span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(<span class="st">'pROC'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+</section>
+<section id="load-data" class="level2">
+<h2 class="anchored" data-anchor-id="load-data">Load Data</h2>
+<p>Now that we have the relevant packages loaded, let’s get started getting our data together. Starting with game data, we’ll pull game results from 2011 - 2021</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Scrape schedule Results</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">load_schedules</span>(<span class="at">seasons =</span> <span class="fu">seq</span>(<span class="dv">2011</span>,<span class="dv">2021</span>)) <span class="ot">-&gt;</span> nfl_game_results </span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(nfl_game_results)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 46
+  game_id   season game_type  week gameday weekday gametime away_team away_score
+  &lt;chr&gt;      &lt;int&gt; &lt;chr&gt;     &lt;int&gt; &lt;chr&gt;   &lt;chr&gt;   &lt;chr&gt;    &lt;chr&gt;          &lt;int&gt;
+1 2011_01_…   2011 REG           1 2011-0… Thursd… 20:30    NO                34
+2 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    PIT                7
+3 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    ATL               12
+4 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    CIN               27
+5 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    IND                7
+6 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    TEN               14
+# ℹ 37 more variables: home_team &lt;chr&gt;, home_score &lt;int&gt;, location &lt;chr&gt;,
+#   result &lt;int&gt;, total &lt;int&gt;, overtime &lt;int&gt;, old_game_id &lt;chr&gt;, gsis &lt;int&gt;,
+#   nfl_detail_id &lt;chr&gt;, pfr &lt;chr&gt;, pff &lt;int&gt;, espn &lt;chr&gt;, ftn &lt;int&gt;,
+#   away_rest &lt;int&gt;, home_rest &lt;int&gt;, away_moneyline &lt;int&gt;,
+#   home_moneyline &lt;int&gt;, spread_line &lt;dbl&gt;, away_spread_odds &lt;int&gt;,
+#   home_spread_odds &lt;int&gt;, total_line &lt;dbl&gt;, under_odds &lt;int&gt;,
+#   over_odds &lt;int&gt;, div_game &lt;int&gt;, roof &lt;chr&gt;, surface &lt;chr&gt;, temp &lt;int&gt;, …</code></pre>
+</div>
+</div>
+<p>We’ve loaded our schedules in with some interesting variables to use in our model. However, it’s not quite in the format we need it to be. Ideally, we’d like to feed in 2 games and have the model give us a winner.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>nfl_game_results <span class="sc">%&gt;%</span></span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_longer</span>(<span class="at">cols =</span> <span class="fu">c</span>(away_team,home_team),</span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>               <span class="at">names_to =</span> <span class="st">"home_away"</span>,</span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>               <span class="at">values_to =</span> <span class="st">"team"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">team_score =</span> <span class="fu">ifelse</span>(home_away <span class="sc">==</span> <span class="st">"home_team"</span>,<span class="at">yes =</span> home_score,<span class="at">no =</span> away_score),</span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">opp_score =</span> <span class="fu">ifelse</span>(home_away <span class="sc">==</span> <span class="st">"home_team"</span>, away_score,home_score)) <span class="sc">%&gt;%</span>  <span class="co"># sort for cumulative avg</span></span>
+<span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(season,week) <span class="sc">%&gt;%</span></span>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(season,game_id,team,team_score,opp_score) <span class="ot">-&gt;</span> team_games</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Let’s use <code>pivot_longer()</code> to rearrange our dataset to make our dataset look like a</p>
 
 
+</section>
 
 </main> <!-- /main -->
 <script id="quarto-html-after-body" type="application/javascript">
