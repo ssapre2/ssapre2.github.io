@@ -30,7 +30,7 @@ library('pROC')
 
 ## Load Data
 
-Now that we have the relevant packages loaded, let's get started getting our data together. Starting with game data, we'll pull game results from 2011 - 2021
+Now that we have the relevant packages loaded, let's get started getting our data together. Starting with game data, we'll pull game results from 2011 - 2021. Here, we see that we get a schedule where each row (record) represents a game. There's a home and away team, corresponding scores, and more for each game.
 
 ```{r}
 # Scrape schedule Results
@@ -49,15 +49,29 @@ nfl_game_results %>%
   mutate(team_score = ifelse(home_away == "home_team",yes = home_score,no = away_score),
          opp_score = ifelse(home_away == "home_team", away_score,home_score)) %>%  # sort for cumulative avg
   arrange(season,week) %>%
-  select(season,game_id,team,team_score,opp_score) -> team_games
+  select(season,game_id,team,team_score,opp_score,week) -> team_games
 ```
 
 Let's use `pivot_longer()` to rearrange our dataset and select some simple variables before making the matchup set.
 
-Then, we'll create some features measuring cumalitve and scores
+## Feature Engineering
+
+Our goal is to be able to predict the outcome of each. To do that, we need to think about what impacts the outcome of a game before teams even take the field. 
+
+In the case of an NFL game it could things like player skill level, how far a team has to travel, injuries, even the food that players ate the night before. Using `nflreadr` we can see that there are tons of features we could see impacting the game such as .....
+
+
+First, let's start with what I think could have the biggest impact on ... team strength! 
+
+There are several ways to quantify team strength, some more complex then others, but for this quick tutorial, we will use recent results as a measure of team strength. The results will be in the form of Cumulative points scored/allowed and winning percentage leading up to the game.
+
+Then, we'll create some features...
+
+First, cumulative points.
 
 ```{r}
 team_games %>%
+  arrange(week) %>%
   group_by(season,team) %>%
   mutate(cum_score_mean = cummean(team_score),
           cum_score_opp = cummean(opp_score),
@@ -65,10 +79,145 @@ team_games %>%
           cum_losses = cumsum(team_score < opp_score),
           cum_ties = cumsum(team_score == opp_score),
          cum_win_pct = cum_wins / (cum_wins + cum_losses),
-         cum_win_pct_lag = lag(cum_win_pct,1),
+         cum_win_pct_lag_1 = lag(cum_win_pct,1),
          cum_score_lag_1 = lag(cum_score_mean,1),
          cum_opp_lag_1 = lag(cum_score_opp,1)
          ) %>%
+  # Non-lag variables leak info
+  select(week,game_id,contains('lag_1')) %>%
   ungroup() -> cum_avgs
 ```
+
+
+Win percentage.
+
+```{r ignore = TRUE}
+team_games %>%
+  group_by(season,team) %>%
+  summarise(wins = sum(team_score > opp_score),
+            losses = sum(team_score < opp_score),
+            ties = sum(team_score == opp_score))%>%
+  ungroup() %>%
+  arrange(season) %>%
+  group_by(team) %>%
+  mutate(win_pct = wins / (wins + losses),
+         lag1_win_pct = lag(win_pct,1)) %>%
+  ungroup() -> team_win_pct
+```
+
+This should be a good start, but I still feel like something is missing. If I'm trying to predict who will win the game, I want to see the injury report. I want to know who's actually in the game. Thankfully `nflreadr` provides that info.
+
+First, we load in depth charts and injury info because we want to know who will be injured, but also if they play an important role on their team. While it would be helpful to know which Niners RBs are out, it would probably helpful know if it's CMc or not.
+
+
+```{r}
+dc = load_depth_charts(seq(2011,2021))
+injuries = load_injuries(seq(2011,2021))
+```
+
+
+```{r}
+injuries %>%
+  filter(report_status == "Out") -> out_inj
+
+dc %>% 
+  filter(depth_team == 1) -> starters
+
+starters %>%
+  select(-c(last_name,first_name,position,full_name)) %>%
+  inner_join(out_inj, by = c('season','club_code' = 'team','gsis_id','game_type','week')) -> injured_starters
+
+# Number of injuries by position
+injured_starters %>%
+  group_by(season,club_code,week,position) %>%
+  summarise(starters_injured = n()) %>%
+  ungroup() %>%
+  pivot_wider(names_from = position, names_prefix = "injured_",values_from = starters_injured) -> injuries_position
+
+head(injuries_position)
+
+```
+
+Alright, now we have some flags for injured starter at each position. Coming up, we need to bring all of our new features together.
+
+## Joins
+
+```{r}
+nfl_game_results %>%
+  inner_join(cum_avgs, by = c('game_id','season','home_team' = 'team')) %>%
+  inner_join(cum_avgs, by = c('game_id','season','away_team' = 'team'),suffix = c('_home','_away'))-> w_avgs
+
+# Check for stragglers
+nfl_game_results %>%
+  anti_join(cum_avgs, by = c('game_id','season','home_team' = 'team')) %>%
+  nrow()
+
+# Join previous season's results
+#w_avgs %>%
+#  left_join(team_win_pct,by = c('season','home_team' = 'team')) %>%
+#  left_join(team_win_pct, by = c('away_team' = 'team','season'),suffix = c('_home','_away')) -> matchups
+```
+
+
+```{r}
+
+# Indicate whether home team won
+w_avgs %>%
+  mutate(home_win = result > 0) -> matchups
+```
+
+
+Now, let's bring in our injury data.
+
+```{r}
+matchups %>%
+  left_join(injuries_position,by = c('season','home_team'='club_code','week')) %>%
+  left_join(injuries_position,by = c('season','away_team'='club_code','week'),suffix = c('_home','_away')) %>%
+  mutate(across(starts_with('injured_'), ~replace_na(.x, 0))) -> matchup_full
+```
+
+
+
+And ... BOOM! We have a dataset with game matchups and some features to start out. Feel free to peruse the data to find potential features to include in our Model. 
+
+
+# Building the Model
+
+Before we do any preprocessing, let's split the data.
+
+First let's remove columns that might leak info to the model. Remember the model must only use information available prior to kickoff
+
+```{r}
+matchup_full %>%
+  select(-c(home_score,away_score,overtime,home_team,away_team,away_qb_name,home_qb_name)) -> matchup_ready
+```
+
+Now, let's look for the most ready 
+
+```{r}
+colSums(is.na(matchup_ready))
+```
+
+
+
+```{r}
+# Hold 
+trainIndex <- createDataPartition(matchup_full$home_win, p = 0.7, list = FALSE)
+train_data <- matchup_full[trainIndex, ]
+test_data <- matchup_full[-trainIndex, ] %>%
+  # Remove first season
+  filter(season != 2011)
+```
+
+
+```{r}
+train_data
+```
+
+
+
+
+
+
+
 

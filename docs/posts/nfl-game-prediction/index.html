@@ -242,7 +242,87 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(season,week) <span class="sc">%&gt;%</span></span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(season,game_id,team,team_score,opp_score) <span class="ot">-&gt;</span> team_games</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>Let’s use <code>pivot_longer()</code> to rearrange our dataset to make our dataset look like a</p>
+<p>Let’s use <code>pivot_longer()</code> to rearrange our dataset and select some simple variables before making the matchup set.</p>
+</section>
+<section id="feature-engineering" class="level2">
+<h2 class="anchored" data-anchor-id="feature-engineering">Feature Engineering</h2>
+<p>Then, we’ll create some features…</p>
+<p>First, cumulative points.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>team_games <span class="sc">%&gt;%</span></span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(season,team) <span class="sc">%&gt;%</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">cum_score_mean =</span> <span class="fu">cummean</span>(team_score),</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_score_opp =</span> <span class="fu">cummean</span>(opp_score),</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_wins =</span> <span class="fu">cumsum</span>(team_score <span class="sc">&gt;</span> opp_score),</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_losses =</span> <span class="fu">cumsum</span>(team_score <span class="sc">&lt;</span> opp_score),</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_ties =</span> <span class="fu">cumsum</span>(team_score <span class="sc">==</span> opp_score),</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_win_pct =</span> cum_wins <span class="sc">/</span> (cum_wins <span class="sc">+</span> cum_losses),</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_win_pct_lag =</span> <span class="fu">lag</span>(cum_win_pct,<span class="dv">1</span>),</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_score_lag_1 =</span> <span class="fu">lag</span>(cum_score_mean,<span class="dv">1</span>),</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_opp_lag_1 =</span> <span class="fu">lag</span>(cum_score_opp,<span class="dv">1</span>)</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>         ) <span class="sc">%&gt;%</span></span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="ot">-&gt;</span> cum_avgs</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Win percentage.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>team_games <span class="sc">%&gt;%</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(season,team) <span class="sc">%&gt;%</span></span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">wins =</span> <span class="fu">sum</span>(team_score <span class="sc">&gt;</span> opp_score),</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>            <span class="at">losses =</span> <span class="fu">sum</span>(team_score <span class="sc">&lt;</span> opp_score),</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>            <span class="at">ties =</span> <span class="fu">sum</span>(team_score <span class="sc">==</span> opp_score))<span class="sc">%&gt;%</span></span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(season) <span class="sc">%&gt;%</span></span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(team) <span class="sc">%&gt;%</span></span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">win_pct =</span> wins <span class="sc">/</span> (wins <span class="sc">+</span> losses),</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">lag1_win_pct =</span> <span class="fu">lag</span>(win_pct,<span class="dv">1</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="ot">-&gt;</span> team_win_pct</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="joins" class="level2">
+<h2 class="anchored" data-anchor-id="joins">Joins</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>nfl_game_results <span class="sc">%&gt;%</span></span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(cum_avgs, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'game_id'</span>,<span class="st">'season'</span>,<span class="st">'home_team'</span> <span class="ot">=</span> <span class="st">'team'</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(cum_avgs, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'game_id'</span>,<span class="st">'season'</span>,<span class="st">'away_team'</span> <span class="ot">=</span> <span class="st">'team'</span>),<span class="at">suffix =</span> <span class="fu">c</span>(<span class="st">'_home'</span>,<span class="st">'_away'</span>))<span class="ot">-&gt;</span> w_avgs</span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Check for stragglers</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>nfl_game_results <span class="sc">%&gt;%</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">anti_join</span>(cum_avgs, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'game_id'</span>,<span class="st">'season'</span>,<span class="st">'home_team'</span> <span class="ot">=</span> <span class="st">'team'</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">nrow</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Join previous season's results</span></span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>w_avgs <span class="sc">%&gt;%</span></span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(team_win_pct,<span class="at">by =</span> <span class="fu">c</span>(<span class="st">'season'</span>,<span class="st">'home_team'</span> <span class="ot">=</span> <span class="st">'team'</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(team_win_pct, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'away_team'</span> <span class="ot">=</span> <span class="st">'team'</span>,<span class="st">'season'</span>),<span class="at">suffix =</span> <span class="fu">c</span>(<span class="st">'_home'</span>,<span class="st">'_away'</span>)) <span class="ot">-&gt;</span> matchups</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>matchups <span class="sc">%&gt;%</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 78
+  game_id   season game_type  week gameday weekday gametime away_team away_score
+  &lt;chr&gt;      &lt;int&gt; &lt;chr&gt;     &lt;int&gt; &lt;chr&gt;   &lt;chr&gt;   &lt;chr&gt;    &lt;chr&gt;          &lt;int&gt;
+1 2011_01_…   2011 REG           1 2011-0… Thursd… 20:30    NO                34
+2 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    PIT                7
+3 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    ATL               12
+4 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    CIN               27
+5 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    IND                7
+6 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    TEN               14
+# ℹ 69 more variables: home_team &lt;chr&gt;, home_score &lt;int&gt;, location &lt;chr&gt;,
+#   result &lt;int&gt;, total &lt;int&gt;, overtime &lt;int&gt;, old_game_id &lt;chr&gt;, gsis &lt;int&gt;,
+#   nfl_detail_id &lt;chr&gt;, pfr &lt;chr&gt;, pff &lt;int&gt;, espn &lt;chr&gt;, ftn &lt;int&gt;,
+#   away_rest &lt;int&gt;, home_rest &lt;int&gt;, away_moneyline &lt;int&gt;,
+#   home_moneyline &lt;int&gt;, spread_line &lt;dbl&gt;, away_spread_odds &lt;int&gt;,
+#   home_spread_odds &lt;int&gt;, total_line &lt;dbl&gt;, under_odds &lt;int&gt;,
+#   over_odds &lt;int&gt;, div_game &lt;int&gt;, roof &lt;chr&gt;, surface &lt;chr&gt;, temp &lt;int&gt;, …</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Indicate whether home team won</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>matchups <span class="sc">%&gt;%</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">home_win =</span> result <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="ot">-&gt;</span> matchup_results</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>And … BOOM! We have a dataset with game matchups and some features to start out.</p>
 
 
 </section>
