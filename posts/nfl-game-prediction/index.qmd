@@ -144,12 +144,12 @@ Alright, now we have some flags for injured starter at each position. Coming up,
 
 ```{r}
 nfl_game_results %>%
-  inner_join(cum_avgs, by = c('game_id','season','home_team' = 'team')) %>%
-  inner_join(cum_avgs, by = c('game_id','season','away_team' = 'team'),suffix = c('_home','_away'))-> w_avgs
+  inner_join(cum_avgs, by = c('game_id','season','week','home_team' = 'team')) %>%
+  inner_join(cum_avgs, by = c('game_id','season','week','away_team' = 'team'),suffix = c('_home','_away'))-> w_avgs
 
 # Check for stragglers
 nfl_game_results %>%
-  anti_join(cum_avgs, by = c('game_id','season','home_team' = 'team')) %>%
+  anti_join(cum_avgs, by = c('game_id','season','home_team' = 'team','week')) %>%
   nrow()
 
 # Join previous season's results
@@ -192,12 +192,22 @@ matchup_full %>%
   select(-c(home_score,away_score,overtime,home_team,away_team,away_qb_name,home_qb_name)) -> matchup_ready
 ```
 
-Now, let's look for the most ready 
+Now, let's look for the most model-ready variables.
 
 ```{r}
 colSums(is.na(matchup_ready))
 ```
 
+Looks like there are a few varibles with several na's. Though we'd like to keep the "lag" columns that we created. 
+
+```{r}
+colnames(matchup_ready[colSums(is.na(matchup_ready)) > 178]) -> columns_to_delete
+columns_to_delete
+
+# Remove columns
+matchup_ready = matchup_ready %>%
+  select(-c(columns_to_delete))
+```
 
 
 ```{r}
@@ -211,7 +221,7 @@ test_data <- matchup_full[-trainIndex, ] %>%
 
 
 ```{r}
-train_data
+head(train_data)
 ```
 
 

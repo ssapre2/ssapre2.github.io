@@ -207,7 +207,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </section>
 <section id="load-data" class="level2">
 <h2 class="anchored" data-anchor-id="load-data">Load Data</h2>
-<p>Now that we have the relevant packages loaded, let’s get started getting our data together. Starting with game data, we’ll pull game results from 2011 - 2021</p>
+<p>Now that we have the relevant packages loaded, let’s get started getting our data together. Starting with game data, we’ll pull game results from 2011 - 2021. Here, we see that we get a schedule where each row (record) represents a game. There’s a home and away team, corresponding scores, and more for each game.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Scrape schedule Results</span></span>
 <span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="fu">load_schedules</span>(<span class="at">seasons =</span> <span class="fu">seq</span>(<span class="dv">2011</span>,<span class="dv">2021</span>)) <span class="ot">-&gt;</span> nfl_game_results </span>
@@ -240,31 +240,38 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">team_score =</span> <span class="fu">ifelse</span>(home_away <span class="sc">==</span> <span class="st">"home_team"</span>,<span class="at">yes =</span> home_score,<span class="at">no =</span> away_score),</span>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>         <span class="at">opp_score =</span> <span class="fu">ifelse</span>(home_away <span class="sc">==</span> <span class="st">"home_team"</span>, away_score,home_score)) <span class="sc">%&gt;%</span>  <span class="co"># sort for cumulative avg</span></span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(season,week) <span class="sc">%&gt;%</span></span>
-<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(season,game_id,team,team_score,opp_score) <span class="ot">-&gt;</span> team_games</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(season,game_id,team,team_score,opp_score,week) <span class="ot">-&gt;</span> team_games</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Let’s use <code>pivot_longer()</code> to rearrange our dataset and select some simple variables before making the matchup set.</p>
 </section>
 <section id="feature-engineering" class="level2">
 <h2 class="anchored" data-anchor-id="feature-engineering">Feature Engineering</h2>
+<p>Our goal is to be able to predict the outcome of each. To do that, we need to think about what impacts the outcome of a game before teams even take the field.</p>
+<p>In the case of an NFL game it could things like player skill level, how far a team has to travel, injuries, even the food that players ate the night before. Using <code>nflreadr</code> we can see that there are tons of features we could see impacting the game such as …..</p>
+<p>First, let’s start with what I think could have the biggest impact on … team strength!</p>
+<p>There are several ways to quantify team strength, some more complex then others, but for this quick tutorial, we will use recent results as a measure of team strength. The results will be in the form of Cumulative points scored/allowed and winning percentage leading up to the game.</p>
 <p>Then, we’ll create some features…</p>
 <p>First, cumulative points.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>team_games <span class="sc">%&gt;%</span></span>
-<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(season,team) <span class="sc">%&gt;%</span></span>
-<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">cum_score_mean =</span> <span class="fu">cummean</span>(team_score),</span>
-<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_score_opp =</span> <span class="fu">cummean</span>(opp_score),</span>
-<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_wins =</span> <span class="fu">cumsum</span>(team_score <span class="sc">&gt;</span> opp_score),</span>
-<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_losses =</span> <span class="fu">cumsum</span>(team_score <span class="sc">&lt;</span> opp_score),</span>
-<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_ties =</span> <span class="fu">cumsum</span>(team_score <span class="sc">==</span> opp_score),</span>
-<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_win_pct =</span> cum_wins <span class="sc">/</span> (cum_wins <span class="sc">+</span> cum_losses),</span>
-<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_win_pct_lag =</span> <span class="fu">lag</span>(cum_win_pct,<span class="dv">1</span>),</span>
-<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_score_lag_1 =</span> <span class="fu">lag</span>(cum_score_mean,<span class="dv">1</span>),</span>
-<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_opp_lag_1 =</span> <span class="fu">lag</span>(cum_score_opp,<span class="dv">1</span>)</span>
-<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>         ) <span class="sc">%&gt;%</span></span>
-<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="ot">-&gt;</span> cum_avgs</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(week) <span class="sc">%&gt;%</span></span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(season,team) <span class="sc">%&gt;%</span></span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">cum_score_mean =</span> <span class="fu">cummean</span>(team_score),</span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_score_opp =</span> <span class="fu">cummean</span>(opp_score),</span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_wins =</span> <span class="fu">cumsum</span>(team_score <span class="sc">&gt;</span> opp_score),</span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_losses =</span> <span class="fu">cumsum</span>(team_score <span class="sc">&lt;</span> opp_score),</span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>          <span class="at">cum_ties =</span> <span class="fu">cumsum</span>(team_score <span class="sc">==</span> opp_score),</span>
+<span id="cb5-9"><a href="#cb5-9" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_win_pct =</span> cum_wins <span class="sc">/</span> (cum_wins <span class="sc">+</span> cum_losses),</span>
+<span id="cb5-10"><a href="#cb5-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_win_pct_lag_1 =</span> <span class="fu">lag</span>(cum_win_pct,<span class="dv">1</span>),</span>
+<span id="cb5-11"><a href="#cb5-11" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_score_lag_1 =</span> <span class="fu">lag</span>(cum_score_mean,<span class="dv">1</span>),</span>
+<span id="cb5-12"><a href="#cb5-12" aria-hidden="true" tabindex="-1"></a>         <span class="at">cum_opp_lag_1 =</span> <span class="fu">lag</span>(cum_score_opp,<span class="dv">1</span>)</span>
+<span id="cb5-13"><a href="#cb5-13" aria-hidden="true" tabindex="-1"></a>         ) <span class="sc">%&gt;%</span></span>
+<span id="cb5-14"><a href="#cb5-14" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Non-lag variables leak info</span></span>
+<span id="cb5-15"><a href="#cb5-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(week,game_id,<span class="fu">contains</span>(<span class="st">'lag_1'</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb5-16"><a href="#cb5-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="ot">-&gt;</span> cum_avgs</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Win percentage.</p>
-<div class="cell">
+<div class="cell" data-ignore="true">
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>team_games <span class="sc">%&gt;%</span></span>
 <span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(season,team) <span class="sc">%&gt;%</span></span>
 <span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">wins =</span> <span class="fu">sum</span>(team_score <span class="sc">&gt;</span> opp_score),</span>
@@ -277,40 +284,170 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>         <span class="at">lag1_win_pct =</span> <span class="fu">lag</span>(win_pct,<span class="dv">1</span>)) <span class="sc">%&gt;%</span></span>
 <span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="ot">-&gt;</span> team_win_pct</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+<p>This should be a good start, but I still feel like something is missing. If I’m trying to predict who will win the game, I want to see the injury report. I want to know who’s actually in the game. Thankfully <code>nflreadr</code> provides that info.</p>
+<p>First, we load in depth charts and injury info because we want to know who will be injured, but also if they play an important role on their team. While it would be helpful to know which Niners RBs are out, it would probably helpful know if it’s CMc or not.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>dc <span class="ot">=</span> <span class="fu">load_depth_charts</span>(<span class="fu">seq</span>(<span class="dv">2011</span>,<span class="dv">2021</span>))</span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>injuries <span class="ot">=</span> <span class="fu">load_injuries</span>(<span class="fu">seq</span>(<span class="dv">2011</span>,<span class="dv">2021</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a>injuries <span class="sc">%&gt;%</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(report_status <span class="sc">==</span> <span class="st">"Out"</span>) <span class="ot">-&gt;</span> out_inj</span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-4"><a href="#cb8-4" aria-hidden="true" tabindex="-1"></a>dc <span class="sc">%&gt;%</span> </span>
+<span id="cb8-5"><a href="#cb8-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(depth_team <span class="sc">==</span> <span class="dv">1</span>) <span class="ot">-&gt;</span> starters</span>
+<span id="cb8-6"><a href="#cb8-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-7"><a href="#cb8-7" aria-hidden="true" tabindex="-1"></a>starters <span class="sc">%&gt;%</span></span>
+<span id="cb8-8"><a href="#cb8-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(last_name,first_name,position,full_name)) <span class="sc">%&gt;%</span></span>
+<span id="cb8-9"><a href="#cb8-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(out_inj, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'season'</span>,<span class="st">'club_code'</span> <span class="ot">=</span> <span class="st">'team'</span>,<span class="st">'gsis_id'</span>,<span class="st">'game_type'</span>,<span class="st">'week'</span>)) <span class="ot">-&gt;</span> injured_starters</span>
+<span id="cb8-10"><a href="#cb8-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-11"><a href="#cb8-11" aria-hidden="true" tabindex="-1"></a><span class="co"># Number of injuries by position</span></span>
+<span id="cb8-12"><a href="#cb8-12" aria-hidden="true" tabindex="-1"></a>injured_starters <span class="sc">%&gt;%</span></span>
+<span id="cb8-13"><a href="#cb8-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(season,club_code,week,position) <span class="sc">%&gt;%</span></span>
+<span id="cb8-14"><a href="#cb8-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">starters_injured =</span> <span class="fu">n</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb8-15"><a href="#cb8-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb8-16"><a href="#cb8-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> position, <span class="at">names_prefix =</span> <span class="st">"injured_"</span>,<span class="at">values_from =</span> starters_injured) <span class="ot">-&gt;</span> injuries_position</span>
+<span id="cb8-17"><a href="#cb8-17" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb8-18"><a href="#cb8-18" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(injuries_position)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 19
+  season club_code  week injured_S injured_LB injured_RB injured_T injured_C
+   &lt;dbl&gt; &lt;chr&gt;     &lt;dbl&gt;     &lt;int&gt;      &lt;int&gt;      &lt;int&gt;     &lt;int&gt;     &lt;int&gt;
+1   2011 ARI           7         1         NA         NA        NA        NA
+2   2011 ARI           8         1         NA         NA        NA        NA
+3   2011 ARI           9        NA          1          1        NA        NA
+4   2011 ARI          10         1          1         NA        NA        NA
+5   2011 ARI          11         1          1         NA        NA        NA
+6   2011 ARI          12         1          1         NA        NA        NA
+# ℹ 11 more variables: injured_DT &lt;int&gt;, injured_WR &lt;int&gt;, injured_CB &lt;int&gt;,
+#   injured_G &lt;int&gt;, injured_K &lt;int&gt;, injured_TE &lt;int&gt;, injured_QB &lt;int&gt;,
+#   injured_DE &lt;int&gt;, injured_P &lt;int&gt;, injured_LS &lt;int&gt;, injured_FB &lt;int&gt;</code></pre>
+</div>
+</div>
+<p>Alright, now we have some flags for injured starter at each position. Coming up, we need to bring all of our new features together.</p>
 </section>
 <section id="joins" class="level2">
 <h2 class="anchored" data-anchor-id="joins">Joins</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>nfl_game_results <span class="sc">%&gt;%</span></span>
-<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(cum_avgs, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'game_id'</span>,<span class="st">'season'</span>,<span class="st">'home_team'</span> <span class="ot">=</span> <span class="st">'team'</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(cum_avgs, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'game_id'</span>,<span class="st">'season'</span>,<span class="st">'away_team'</span> <span class="ot">=</span> <span class="st">'team'</span>),<span class="at">suffix =</span> <span class="fu">c</span>(<span class="st">'_home'</span>,<span class="st">'_away'</span>))<span class="ot">-&gt;</span> w_avgs</span>
-<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Check for stragglers</span></span>
-<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>nfl_game_results <span class="sc">%&gt;%</span></span>
-<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">anti_join</span>(cum_avgs, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'game_id'</span>,<span class="st">'season'</span>,<span class="st">'home_team'</span> <span class="ot">=</span> <span class="st">'team'</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">nrow</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>nfl_game_results <span class="sc">%&gt;%</span></span>
+<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(cum_avgs, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'game_id'</span>,<span class="st">'season'</span>,<span class="st">'home_team'</span> <span class="ot">=</span> <span class="st">'team'</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-3"><a href="#cb10-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(cum_avgs, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'game_id'</span>,<span class="st">'season'</span>,<span class="st">'away_team'</span> <span class="ot">=</span> <span class="st">'team'</span>),<span class="at">suffix =</span> <span class="fu">c</span>(<span class="st">'_home'</span>,<span class="st">'_away'</span>))<span class="ot">-&gt;</span> w_avgs</span>
+<span id="cb10-4"><a href="#cb10-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb10-5"><a href="#cb10-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Check for stragglers</span></span>
+<span id="cb10-6"><a href="#cb10-6" aria-hidden="true" tabindex="-1"></a>nfl_game_results <span class="sc">%&gt;%</span></span>
+<span id="cb10-7"><a href="#cb10-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">anti_join</span>(cum_avgs, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'game_id'</span>,<span class="st">'season'</span>,<span class="st">'home_team'</span> <span class="ot">=</span> <span class="st">'team'</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb10-8"><a href="#cb10-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">nrow</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 0</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Join previous season's results</span></span>
-<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a>w_avgs <span class="sc">%&gt;%</span></span>
-<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(team_win_pct,<span class="at">by =</span> <span class="fu">c</span>(<span class="st">'season'</span>,<span class="st">'home_team'</span> <span class="ot">=</span> <span class="st">'team'</span>)) <span class="sc">%&gt;%</span></span>
-<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(team_win_pct, <span class="at">by =</span> <span class="fu">c</span>(<span class="st">'away_team'</span> <span class="ot">=</span> <span class="st">'team'</span>,<span class="st">'season'</span>),<span class="at">suffix =</span> <span class="fu">c</span>(<span class="st">'_home'</span>,<span class="st">'_away'</span>)) <span class="ot">-&gt;</span> matchups</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Join previous season's results</span></span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a><span class="co">#w_avgs %&gt;%</span></span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a><span class="co">#  left_join(team_win_pct,by = c('season','home_team' = 'team')) %&gt;%</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a><span class="co">#  left_join(team_win_pct, by = c('away_team' = 'team','season'),suffix = c('_home','_away')) -&gt; matchups</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb10"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a>matchups <span class="sc">%&gt;%</span></span>
-<span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">head</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Indicate whether home team won</span></span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>w_avgs <span class="sc">%&gt;%</span></span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">home_win =</span> result <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="ot">-&gt;</span> matchups</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now, let’s bring in our injury data.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>matchups <span class="sc">%&gt;%</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(injuries_position,<span class="at">by =</span> <span class="fu">c</span>(<span class="st">'season'</span>,<span class="st">'home_team'</span><span class="ot">=</span><span class="st">'club_code'</span>,<span class="st">'week'</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">left_join</span>(injuries_position,<span class="at">by =</span> <span class="fu">c</span>(<span class="st">'season'</span>,<span class="st">'away_team'</span><span class="ot">=</span><span class="st">'club_code'</span>,<span class="st">'week'</span>),<span class="at">suffix =</span> <span class="fu">c</span>(<span class="st">'_home'</span>,<span class="st">'_away'</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(<span class="fu">starts_with</span>(<span class="st">'injured_'</span>), <span class="sc">~</span><span class="fu">replace_na</span>(.x, <span class="dv">0</span>))) <span class="ot">-&gt;</span> matchup_full</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>And … BOOM! We have a dataset with game matchups and some features to start out. Feel free to peruse the data to find potential features to include in our Model.</p>
+</section>
+<section id="building-the-model" class="level1">
+<h1>Building the Model</h1>
+<p>Before we do any preprocessing, let’s split the data.</p>
+<p>First let’s remove columns that might leak info to the model. Remember the model must only use information available prior to kickoff</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>matchup_full <span class="sc">%&gt;%</span></span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span><span class="fu">c</span>(home_score,away_score,overtime,home_team,away_team,away_qb_name,home_qb_name)) <span class="ot">-&gt;</span> matchup_ready</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now, let’s look for the most ready</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a><span class="fu">colSums</span>(<span class="fu">is.na</span>(matchup_ready))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 6 × 78
-  game_id   season game_type  week gameday weekday gametime away_team away_score
-  &lt;chr&gt;      &lt;int&gt; &lt;chr&gt;     &lt;int&gt; &lt;chr&gt;   &lt;chr&gt;   &lt;chr&gt;    &lt;chr&gt;          &lt;int&gt;
-1 2011_01_…   2011 REG           1 2011-0… Thursd… 20:30    NO                34
-2 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    PIT                7
-3 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    ATL               12
-4 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    CIN               27
-5 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    IND                7
-6 2011_01_…   2011 REG           1 2011-0… Sunday  13:00    TEN               14
-# ℹ 69 more variables: home_team &lt;chr&gt;, home_score &lt;int&gt;, location &lt;chr&gt;,
+<pre><code>               game_id                 season              game_type 
+                     0                      0                      0 
+                week.x                gameday                weekday 
+                     0                      0                      0 
+              gametime               location                 result 
+                     0                      0                      0 
+                 total            old_game_id                   gsis 
+                     0                      0                      0 
+         nfl_detail_id                    pfr                    pff 
+                  2685                      0                      0 
+                  espn                    ftn              away_rest 
+                     0                   2137                      0 
+             home_rest         away_moneyline         home_moneyline 
+                     0                      1                      1 
+           spread_line       away_spread_odds       home_spread_odds 
+                     0                      1                      1 
+            total_line             under_odds              over_odds 
+                     0                      1                      1 
+              div_game                   roof                surface 
+                     0                      0                      0 
+                  temp                   wind             away_qb_id 
+                   822                    822                      0 
+            home_qb_id             away_coach             home_coach 
+                     0                      0                      0 
+               referee             stadium_id                stadium 
+                     1                      0                      0 
+                week.y cum_win_pct_lag_1_home   cum_score_lag_1_home 
+                     0                    178                    176 
+    cum_opp_lag_1_home                   week cum_win_pct_lag_1_away 
+                   176                      0                    178 
+  cum_score_lag_1_away     cum_opp_lag_1_away               home_win 
+                   176                    176                      0 
+        injured_S_home        injured_LB_home        injured_RB_home 
+                     0                      0                      0 
+        injured_T_home         injured_C_home        injured_DT_home 
+                     0                      0                      0 
+       injured_WR_home        injured_CB_home         injured_G_home 
+                     0                      0                      0 
+        injured_K_home        injured_TE_home        injured_QB_home 
+                     0                      0                      0 
+       injured_DE_home         injured_P_home        injured_LS_home 
+                     0                      0                      0 
+       injured_FB_home         injured_S_away        injured_LB_away 
+                     0                      0                      0 
+       injured_RB_away         injured_T_away         injured_C_away 
+                     0                      0                      0 
+       injured_DT_away        injured_WR_away        injured_CB_away 
+                     0                      0                      0 
+        injured_G_away         injured_K_away        injured_TE_away 
+                     0                      0                      0 
+       injured_QB_away        injured_DE_away         injured_P_away 
+                     0                      0                      0 
+       injured_LS_away        injured_FB_away 
+                     0                      0 </code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Hold </span></span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>trainIndex <span class="ot">&lt;-</span> <span class="fu">createDataPartition</span>(matchup_full<span class="sc">$</span>home_win, <span class="at">p =</span> <span class="fl">0.7</span>, <span class="at">list =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>train_data <span class="ot">&lt;-</span> matchup_full[trainIndex, ]</span>
+<span id="cb18-4"><a href="#cb18-4" aria-hidden="true" tabindex="-1"></a>test_data <span class="ot">&lt;-</span> matchup_full[<span class="sc">-</span>trainIndex, ] <span class="sc">%&gt;%</span></span>
+<span id="cb18-5"><a href="#cb18-5" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove first season</span></span>
+<span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(season <span class="sc">!=</span> <span class="dv">2011</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(train_data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 87
+  game_id  season game_type week.x gameday weekday gametime away_team away_score
+  &lt;chr&gt;     &lt;dbl&gt; &lt;chr&gt;      &lt;int&gt; &lt;chr&gt;   &lt;chr&gt;   &lt;chr&gt;    &lt;chr&gt;          &lt;int&gt;
+1 2011_01…   2011 REG            1 2011-0… Thursd… 20:30    NO                34
+2 2011_01…   2011 REG            1 2011-0… Sunday  13:00    PIT                7
+3 2011_01…   2011 REG            1 2011-0… Sunday  13:00    ATL               12
+4 2011_01…   2011 REG            1 2011-0… Sunday  13:00    CIN               27
+5 2011_01…   2011 REG            1 2011-0… Sunday  13:00    IND                7
+6 2011_01…   2011 REG            1 2011-0… Sunday  13:00    TEN               14
+# ℹ 78 more variables: home_team &lt;chr&gt;, home_score &lt;int&gt;, location &lt;chr&gt;,
 #   result &lt;int&gt;, total &lt;int&gt;, overtime &lt;int&gt;, old_game_id &lt;chr&gt;, gsis &lt;int&gt;,
 #   nfl_detail_id &lt;chr&gt;, pfr &lt;chr&gt;, pff &lt;int&gt;, espn &lt;chr&gt;, ftn &lt;int&gt;,
 #   away_rest &lt;int&gt;, home_rest &lt;int&gt;, away_moneyline &lt;int&gt;,
@@ -318,11 +455,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 #   home_spread_odds &lt;int&gt;, total_line &lt;dbl&gt;, under_odds &lt;int&gt;,
 #   over_odds &lt;int&gt;, div_game &lt;int&gt;, roof &lt;chr&gt;, surface &lt;chr&gt;, temp &lt;int&gt;, …</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Indicate whether home team won</span></span>
-<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>matchups <span class="sc">%&gt;%</span></span>
-<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">home_win =</span> result <span class="sc">&gt;</span> <span class="dv">0</span>) <span class="ot">-&gt;</span> matchup_results</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>And … BOOM! We have a dataset with game matchups and some features to start out.</p>
 
 
 </section>
