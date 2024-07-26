@@ -209,13 +209,15 @@ matchup_ready = matchup_ready %>%
   select(-c(columns_to_delete))
 ```
 
+What about other NAs? There are still some left. For the purpose of this exercise, let's remove them with na.omit(). This is a bad idea as it leaves potentially useful data on the table.
+
 
 ```{r}
-# Hold 
+# Split Data
 trainIndex <- createDataPartition(matchup_full$home_win, p = 0.7, list = FALSE)
 train_data <- matchup_full[trainIndex, ]
 test_data <- matchup_full[-trainIndex, ] %>%
-  # Remove first season
+  # Remove first season for now
   filter(season != 2011)
 ```
 
@@ -224,10 +226,40 @@ test_data <- matchup_full[-trainIndex, ] %>%
 head(train_data)
 ```
 
+Alright, now that we have our training data ready, let's leverage the power of `tidymodels` to continue our preprocessing. I'm sure, you noticed quite a few variables still containing missing values.
+
+
+```{r}
+library('tidymodels')
+
+rec_impute = recipe(formula = home_win ~ cum_score_lag_1_home +
+                 cum_opp_lag_1_home + cum_score_lag_1_away +
+                 cum_opp_lag_1_away + 
+                 cum_win_pct_lag_1_home +
+                 cum_win_pct_lag_1_away +
+                 injured_QB_home,data = train_data) %>%
+  #impute
+  step_impute_knn(columns = all_numeric_predictors(),neighbors = 5)
 
 
 
+```
 
+
+
+## Modeling 
+
+Ahh finally, now we can get to the actual model building.... which we'll do in about 3 lines of code.
+
+```{r}
+
+```
+
+
+
+```{r}
+colSums(is.na(train_data))
+```
 
 
 
