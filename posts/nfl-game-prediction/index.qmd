@@ -174,6 +174,10 @@ matchups %>%
   left_join(injuries_position,by = c('season','home_team'='club_code','week')) %>%
   left_join(injuries_position,by = c('season','away_team'='club_code','week'),suffix = c('_home','_away')) %>%
   mutate(across(starts_with('injured_'), ~replace_na(.x, 0))) -> matchup_full
+
+matchup_full %>%
+  # Transform outcome into factor variable
+  mutate(home_win = as.factor(home_win)) -> matchup_full
 ```
 
 
@@ -205,8 +209,10 @@ colnames(matchup_ready[colSums(is.na(matchup_ready)) > 178]) -> columns_to_delet
 columns_to_delete
 
 # Remove columns
-matchup_ready = matchup_ready %>%
-  select(-c(columns_to_delete))
+matchup_ready = matchup_ready%>%
+  # Transform outcome into factor variable
+  mutate(home_win = as.factor(home_win)) %>%
+  select(-c(columns_to_delete)) 
 ```
 
 What about other NAs? There are still some left. For the purpose of this exercise, let's remove them with na.omit(). This is a bad idea as it leaves potentially useful data on the table.
@@ -223,7 +229,7 @@ test_data <- matchup_full[-trainIndex, ] %>%
 
 
 ```{r}
-head(train_data)
+colSums(is.na(train_data))
 ```
 
 Alright, now that we have our training data ready, let's leverage the power of `tidymodels` to continue our preprocessing. I'm sure, you noticed quite a few variables still containing missing values.
@@ -238,15 +244,25 @@ rec_impute = recipe(formula = home_win ~
                  cum_opp_lag_1_home + cum_score_lag_1_away +
                  cum_opp_lag_1_away + 
                  cum_win_pct_lag_1_home +
-                 cum_win_pct_lag_1_away +
-                 injured_QB_home,data = train_data) %>%
+                 cum_win_pct_lag_1_away,
+                 data = train_data) %>%
   #create ID role (do not remove) game ID
   update_role(game_id, new_role = "ID") %>%
   #impute
-  step_impute_knn(columns = all_numeric_predictors(),neighbors =2)
+  step_impute_median(starts_with('cum_'))
+
+# Evalate imputation step
+tidy(rec_impute, number = 1)
 
 
 
+
+```
+
+```{r}
+imp_models <- prep(rec_impute, training = train_data)
+
+tidy(imp_models,number = 1)
 ```
 
 
@@ -273,24 +289,20 @@ game_pred_wflow <-
 ```
 
 
-```{r}
-game_pred_wflow
-```
+
 
 
 ```{r}
+library('glmnet')
+
+prep(rec_impute,training = train_data)
+
 game_fit <- 
   game_pred_wflow %>% 
   fit(data = train_data)
 
 ```
 
-
-
-
-```{r}
-colSums(is.na(train_data))
-```
 
 
 
