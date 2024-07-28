@@ -232,14 +232,18 @@ Alright, now that we have our training data ready, let's leverage the power of `
 ```{r}
 library('tidymodels')
 
-rec_impute = recipe(formula = home_win ~ cum_score_lag_1_home +
+rec_impute = recipe(formula = home_win ~
+                      game_id + 
+                      cum_score_lag_1_home +
                  cum_opp_lag_1_home + cum_score_lag_1_away +
                  cum_opp_lag_1_away + 
                  cum_win_pct_lag_1_home +
                  cum_win_pct_lag_1_away +
                  injured_QB_home,data = train_data) %>%
+  #create ID role (do not remove) game ID
+  update_role(game_id, new_role = "ID") %>%
   #impute
-  step_impute_knn(columns = all_numeric_predictors(),neighbors = 5)
+  step_impute_knn(columns = all_numeric_predictors(),neighbors =2)
 
 
 
@@ -252,8 +256,35 @@ rec_impute = recipe(formula = home_win ~ cum_score_lag_1_home +
 Ahh finally, now we can get to the actual model building.... which we'll do in about 3 lines of code.
 
 ```{r}
+# Penalized Linear Regression
+# Mixture = 1 means pure lasso
+lr_mod <- 
+  logistic_reg(penalty = tune(), mixture = 1) %>% 
+  set_engine("glmnet")
+```
+
+
+```{r}
+# create a workflow using recipe and model objects
+game_pred_wflow <- 
+  workflow() %>% 
+  add_model(lr_mod) %>% 
+  add_recipe(rec_impute)
+```
+
+
+```{r}
+game_pred_wflow
+```
+
+
+```{r}
+game_fit <- 
+  game_pred_wflow %>% 
+  fit(data = train_data)
 
 ```
+
 
 
 
