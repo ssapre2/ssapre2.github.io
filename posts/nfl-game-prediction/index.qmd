@@ -6,6 +6,7 @@ categories: [news, code, analysis]
 image: "nflfastR.png"
 execute: 
   warning: false
+page-layout: full
   
 ---
 
@@ -275,7 +276,7 @@ Ahh finally, now we can get to the actual model building.... which we'll do in a
 # Penalized Linear Regression
 # Mixture = 1 means pure lasso
 lr_mod <- 
-  logistic_reg(penalty = tune(), mixture = 1) %>% 
+  logistic_reg(penalty = 0.1, mixture = 1) %>% 
   set_engine("glmnet")
 ```
 
@@ -303,6 +304,11 @@ game_fit <-
 
 ```
 
+Check model fit object and coefficient estimates.
 
+```{r}
+extract_fit_parsnip(game_fit) %>%
+  tidy()
+```
 
 
