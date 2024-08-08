@@ -240,7 +240,7 @@ Alright, now that we have our training data ready, let's leverage the power of `
 library('tidymodels')
 
 rec_impute = recipe(formula = home_win ~
-                      game_id + week +
+                      game_id +
                       cum_score_lag_1_home +
                  cum_opp_lag_1_home + cum_score_lag_1_away +
                  cum_opp_lag_1_away + 
@@ -330,11 +330,21 @@ game_aug %>%
   roc_curve(truth = home_win, .pred_TRUE) %>% 
   autoplot()
 
-# Plot results by week
 
+game_aug %>% select(.pred_class,home_win)
+# Plot results by week
+game_aug %>%
+  group_by(week) %>%
+  summarise(acc = sum(.pred_class== home_win)/n(), n= n()) -> acc_by_week
+
+acc_by_week
+
+acc_by_week %>%
+  ggplot(aes(x = week, y = acc)) +
+  geom_col()
 ```
 
-
+Looks like predictions get slightly stronger throughout season. Sample size is small for end of season.
 
 Ooof! this is a terrible fit. Let's check the model fit.
 
