@@ -240,7 +240,7 @@ Alright, now that we have our training data ready, let's leverage the power of `
 library('tidymodels')
 
 rec_impute = recipe(formula = home_win ~
-                      game_id + 
+                      game_id +
                       cum_score_lag_1_home +
                  cum_opp_lag_1_home + cum_score_lag_1_away +
                  cum_opp_lag_1_away + 
@@ -252,11 +252,10 @@ rec_impute = recipe(formula = home_win ~
   #impute
   step_impute_median(starts_with('cum_'))
 
+# Create recipe to for moneyline model
+
 # Evalate imputation step
 tidy(rec_impute, number = 1)
-
-
-
 
 ```
 
@@ -276,8 +275,16 @@ Ahh finally, now we can get to the actual model building.... which we'll do in a
 # Penalized Linear Regression
 # Mixture = 1 means pure lasso
 lr_mod <- 
-  logistic_reg(penalty = 0.1, mixture = 1) %>% 
-  set_engine("glmnet")
+  logistic_reg() %>% 
+  set_engine("glm")
+
+# Use Light GBM
+library('lightgbm')
+spec_lgb <-
+  boost_tree(trees = tune(), min_n = tune(), tree_depth = tune(),
+             learn_rate = tune(), stop_iter = 10) %>%
+  set_engine("lightgbm") %>%
+  set_mode("classification")
 ```
 
 
@@ -287,6 +294,7 @@ game_pred_wflow <-
   workflow() %>% 
   add_model(lr_mod) %>% 
   add_recipe(rec_impute)
+
 ```
 
 
@@ -308,7 +316,42 @@ Check model fit object and coefficient estimates.
 
 ```{r}
 extract_fit_parsnip(game_fit) %>%
-  tidy()
+  tidy() -> lr_fit
 ```
+
+
+```{r}
+# Use model to make prediction on test data set
+predict(game_fit,new_data = test_data)
+
+game_aug = augment(game_fit,test_data)
+
+```
+
+
+```{r}
+game_aug %>% 
+  roc_curve(truth = home_win, .pred_FALSE) %>% 
+  autoplot()
+```
+
+
+
+Ooof! this is a terrible fit. Let's check the model fit.
+
+```{r}
+game_aug %>% 
+  roc_auc(truth = home_win, .pred_FALSE)
+```
+
+Let's create a new model recipe to check how other models do
+
+```{r}
+
+```
+
+
+
+
 
 

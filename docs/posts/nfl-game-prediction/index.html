@@ -321,7 +321,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 6   2011 ARI          12         1          1         NA        NA        NA
 # ℹ 11 more variables: injured_DT &lt;int&gt;, injured_WR &lt;int&gt;, injured_CB &lt;int&gt;,
 #   injured_G &lt;int&gt;, injured_K &lt;int&gt;, injured_TE &lt;int&gt;, injured_QB &lt;int&gt;,
-#   injured_DE &lt;int&gt;, injured_P &lt;int&gt;, injured_LS &lt;int&gt;, injured_FB &lt;int&gt;</code></pre>
+#   injured_DE &lt;int&gt;, injured_LS &lt;int&gt;, injured_P &lt;int&gt;, injured_FB &lt;int&gt;</code></pre>
 </div>
 </div>
 <p>Alright, now we have some flags for injured starter at each position. Coming up, we need to bring all of our new features together.</p>
@@ -413,9 +413,9 @@ cum_win_pct_lag_1_away   cum_score_lag_1_away     cum_opp_lag_1_away
                      0                      0                      0 
         injured_G_home         injured_K_home        injured_TE_home 
                      0                      0                      0 
-       injured_QB_home        injured_DE_home         injured_P_home 
+       injured_QB_home        injured_DE_home        injured_LS_home 
                      0                      0                      0 
-       injured_LS_home        injured_FB_home         injured_S_away 
+        injured_P_home        injured_FB_home         injured_S_away 
                      0                      0                      0 
        injured_LB_away        injured_RB_away         injured_T_away 
                      0                      0                      0 
@@ -425,7 +425,7 @@ cum_win_pct_lag_1_away   cum_score_lag_1_away     cum_opp_lag_1_away
                      0                      0                      0 
        injured_TE_away        injured_QB_away        injured_DE_away 
                      0                      0                      0 
-        injured_P_away        injured_LS_away        injured_FB_away 
+       injured_LS_away         injured_P_away        injured_FB_away 
                      0                      0                      0 </code></pre>
 </div>
 </div>
@@ -465,31 +465,31 @@ cum_win_pct_lag_1_away   cum_score_lag_1_away     cum_opp_lag_1_away
                 result                  total               overtime 
                      0                      0                      0 
            old_game_id                   gsis          nfl_detail_id 
-                     0                      0                   1889 
+                     0                      0                   1890 
                    pfr                    pff                   espn 
                      0                      0                      0 
                    ftn              away_rest              home_rest 
-                  1494                      0                      0 
+                  1509                      0                      0 
         away_moneyline         home_moneyline            spread_line 
-                     0                      0                      0 
+                     1                      1                      0 
       away_spread_odds       home_spread_odds             total_line 
-                     0                      0                      0 
+                     1                      1                      0 
             under_odds              over_odds               div_game 
-                     0                      0                      0 
+                     1                      1                      0 
                   roof                surface                   temp 
-                     0                      0                    572 
+                     0                      0                    593 
                   wind             away_qb_id             home_qb_id 
-                   572                      0                      0 
+                   593                      0                      0 
           away_qb_name           home_qb_name             away_coach 
                      0                      0                      0 
             home_coach                referee             stadium_id 
-                     0                      0                      0 
+                     0                      1                      0 
                stadium cum_win_pct_lag_1_home   cum_score_lag_1_home 
-                     0                    121                    121 
+                     0                    131                    130 
     cum_opp_lag_1_home cum_win_pct_lag_1_away   cum_score_lag_1_away 
-                   121                    123                    121 
+                   130                    130                    129 
     cum_opp_lag_1_away               home_win         injured_S_home 
-                   121                      0                      0 
+                   129                      0                      0 
        injured_LB_home        injured_RB_home         injured_T_home 
                      0                      0                      0 
         injured_C_home        injured_DT_home        injured_WR_home 
@@ -498,7 +498,7 @@ cum_win_pct_lag_1_away   cum_score_lag_1_away     cum_opp_lag_1_away
                      0                      0                      0 
        injured_TE_home        injured_QB_home        injured_DE_home 
                      0                      0                      0 
-        injured_P_home        injured_LS_home        injured_FB_home 
+       injured_LS_home         injured_P_home        injured_FB_home 
                      0                      0                      0 
         injured_S_away        injured_LB_away        injured_RB_away 
                      0                      0                      0 
@@ -508,7 +508,7 @@ cum_win_pct_lag_1_away   cum_score_lag_1_away     cum_opp_lag_1_away
                      0                      0                      0 
         injured_K_away        injured_TE_away        injured_QB_away 
                      0                      0                      0 
-       injured_DE_away         injured_P_away        injured_LS_away 
+       injured_DE_away        injured_LS_away         injured_P_away 
                      0                      0                      0 
        injured_FB_away 
                      0 </code></pre>
@@ -537,7 +537,7 @@ cum_win_pct_lag_1_away   cum_score_lag_1_away     cum_opp_lag_1_away
 <pre><code># A tibble: 1 × 3
   terms                   value id                 
   &lt;chr&gt;                   &lt;dbl&gt; &lt;chr&gt;              
-1 "starts_with(\"cum_\")"    NA impute_median_PBrY1</code></pre>
+1 "starts_with(\"cum_\")"    NA impute_median_k4UQN</code></pre>
 </div>
 </div>
 <div class="cell">
@@ -548,12 +548,12 @@ cum_win_pct_lag_1_away   cum_score_lag_1_away     cum_opp_lag_1_away
 <pre><code># A tibble: 6 × 3
   terms                  value id                 
   &lt;chr&gt;                  &lt;dbl&gt; &lt;chr&gt;              
-1 cum_score_lag_1_home    23   impute_median_PBrY1
-2 cum_opp_lag_1_home      23   impute_median_PBrY1
-3 cum_score_lag_1_away    23.3 impute_median_PBrY1
-4 cum_opp_lag_1_away      22.8 impute_median_PBrY1
-5 cum_win_pct_lag_1_home   0.5 impute_median_PBrY1
-6 cum_win_pct_lag_1_away   0.5 impute_median_PBrY1</code></pre>
+1 cum_score_lag_1_home    23.1 impute_median_k4UQN
+2 cum_opp_lag_1_home      23   impute_median_k4UQN
+3 cum_score_lag_1_away    23.3 impute_median_k4UQN
+4 cum_opp_lag_1_away      22.8 impute_median_k4UQN
+5 cum_win_pct_lag_1_home   0.5 impute_median_k4UQN
+6 cum_win_pct_lag_1_away   0.5 impute_median_k4UQN</code></pre>
 </div>
 </div>
 <section id="modeling" class="level2">
