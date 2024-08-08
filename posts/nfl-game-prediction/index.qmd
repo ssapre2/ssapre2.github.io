@@ -240,7 +240,7 @@ Alright, now that we have our training data ready, let's leverage the power of `
 library('tidymodels')
 
 rec_impute = recipe(formula = home_win ~
-                      game_id +
+                      game_id + week +
                       cum_score_lag_1_home +
                  cum_opp_lag_1_home + cum_score_lag_1_away +
                  cum_opp_lag_1_away + 
@@ -278,13 +278,6 @@ lr_mod <-
   logistic_reg() %>% 
   set_engine("glm")
 
-# Use Light GBM
-library('lightgbm')
-spec_lgb <-
-  boost_tree(trees = tune(), min_n = tune(), tree_depth = tune(),
-             learn_rate = tune(), stop_iter = 10) %>%
-  set_engine("lightgbm") %>%
-  set_mode("classification")
 ```
 
 
@@ -326,13 +319,19 @@ predict(game_fit,new_data = test_data)
 
 game_aug = augment(game_fit,test_data)
 
+game_aug %>%
+  select(week,season,home_team,away_team,.pred_TRUE,home_win,home_score,away_score) %>%
+  arrange(desc(.pred_TRUE))
 ```
 
 
 ```{r}
 game_aug %>% 
-  roc_curve(truth = home_win, .pred_FALSE) %>% 
+  roc_curve(truth = home_win, .pred_TRUE) %>% 
   autoplot()
+
+# Plot results by week
+
 ```
 
 
@@ -341,13 +340,45 @@ Ooof! this is a terrible fit. Let's check the model fit.
 
 ```{r}
 game_aug %>% 
-  roc_auc(truth = home_win, .pred_FALSE)
+  roc_auc(truth = home_win, .pred_TRUE)
 ```
 
 Let's create a new model recipe to check how other models do
 
 ```{r}
+rec_moneyline = recipe(formula = home_win ~
+                      game_id +home_moneyline,
+                 data = train_data) %>%
+  #create ID role (do not remove) game ID
+  update_role(game_id, new_role = "ID")
 
+# Update workflow
+game_pred_wflow %>%
+  update_recipe(rec_moneyline) -> ml_flow
+
+prep(rec_moneyline,training = train_data)
+
+ml_fit <- 
+  ml_flow %>% 
+  fit(data = train_data)
+
+extract_fit_parsnip(ml_fit) %>%
+  tidy() 
+
+
+# Make predictions
+predict(ml_fit,new_data = test_data)
+
+# Augment dataframe with preds
+ml_aug = augment(ml_fit,test_data)
+
+# Plot ROC
+ml_aug %>% 
+  roc_curve(truth = home_win, .pred_TRUE) %>% 
+  autoplot()
+
+ml_aug %>% 
+  roc_auc(truth = home_win, .pred_TRUE)
 ```
 
 
