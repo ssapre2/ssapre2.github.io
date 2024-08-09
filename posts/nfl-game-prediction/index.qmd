@@ -281,6 +281,13 @@ lr_mod <-
 ```
 
 
+
+```{r}
+# Create folds for cross-validation
+folds <- vfold_cv(train_data)
+```
+
+
 ```{r}
 # create a workflow using recipe and model objects
 game_pred_wflow <- 
@@ -289,7 +296,6 @@ game_pred_wflow <-
   add_recipe(rec_impute)
 
 ```
-
 
 
 
@@ -303,6 +309,9 @@ game_fit <-
   game_pred_wflow %>% 
   fit(data = train_data)
 
+fit_cv = game_pred_wflow %>%
+  fit_resamples(folds)
+
 ```
 
 Check model fit object and coefficient estimates.
@@ -311,6 +320,12 @@ Check model fit object and coefficient estimates.
 extract_fit_parsnip(game_fit) %>%
   tidy() -> lr_fit
 ```
+
+
+```{r}
+collect_metrics(fit_cv)
+```
+
 
 
 ```{r}
