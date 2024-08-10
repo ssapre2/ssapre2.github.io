@@ -357,6 +357,16 @@ acc_by_week
 acc_by_week %>%
   ggplot(aes(x = week, y = acc)) +
   geom_col()
+
+game_aug %>%
+  group_by(season) %>%
+  summarise(acc = sum(.pred_class== home_win)/n(), n= n()) -> acc_by_season
+
+acc_by_season
+
+acc_by_season %>%
+  ggplot(aes(x = season, y = acc)) +
+  geom_col()
 ```
 
 Looks like predictions get slightly stronger throughout season. Sample size is small for end of season.
