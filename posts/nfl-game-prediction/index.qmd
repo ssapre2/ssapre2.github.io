@@ -35,7 +35,7 @@ Now that we have the relevant packages loaded, let's get started getting our dat
 
 ```{r}
 # Scrape schedule Results
-load_schedules(seasons = seq(2011,2021)) -> nfl_game_results 
+load_schedules(seasons = seq(2011,2024)) -> nfl_game_results 
 head(nfl_game_results)
 ```
 
@@ -44,6 +44,8 @@ We've loaded our schedules in with some interesting variables to use in our mode
 
 ```{r}
 nfl_game_results %>%
+  # Remove the upcoming season
+  filter(season < 2024) %>%
   pivot_longer(cols = c(away_team,home_team),
                names_to = "home_away",
                values_to = "team") %>%
@@ -112,8 +114,8 @@ First, we load in depth charts and injury info because we want to know who will 
 
 
 ```{r}
-dc = load_depth_charts(seq(2011,2021))
-injuries = load_injuries(seq(2011,2021))
+dc = load_depth_charts(seq(2011,most_recent_season()))
+injuries = load_injuries(seq(2011,most_recent_season()))
 ```
 
 
@@ -221,11 +223,14 @@ What about other NAs? There are still some left. For the purpose of this exercis
 
 ```{r}
 # Split Data
-trainIndex <- createDataPartition(matchup_full$home_win, p = 0.7, list = FALSE)
-train_data <- matchup_full[trainIndex, ]
-test_data <- matchup_full[-trainIndex, ] %>%
+#trainIndex <- createDataPartition(matchup_full$home_win, p = 0.7, list = FALSE)
+#train_data <- matchup_full[trainIndex, ]
+#test_data <- matchup_full[-trainIndex, ] %>%
   # Remove first season for now
-  filter(season != 2011)
+#  filter(season != 2011)
+splits = initial_split(matchup_full)
+train_data <- training(splits)
+test_data  <- testing(splits)
 ```
 
 
@@ -305,34 +310,57 @@ library('glmnet')
 
 prep(rec_impute,training = train_data)
 
-game_fit <- 
-  game_pred_wflow %>% 
-  fit(data = train_data)
-
 fit_cv = game_pred_wflow %>%
   fit_resamples(folds)
 
 ```
 
-Check model fit object and coefficient estimates.
-
-```{r}
-extract_fit_parsnip(game_fit) %>%
-  tidy() -> lr_fit
-```
+Check for best model fit. It looks like using ROC-AUC and accuracy agree that the first model is the best. We
 
 
 ```{r}
 collect_metrics(fit_cv)
+fit_cv %>%
+  show_best(metric = "roc_auc") -> best_fit
+
+fit_cv %>%
+  show_best(metric = "accuracy") 
 ```
+
+
+Extract best model fit.
+
+
+```{r}
+final_wf = game_pred_wflow %>%
+  finalize_workflow(best_fit)
+```
+
+
+```{r}
+final_fit <- 
+  final_wf %>%
+  last_fit(split = splits) 
+```
+
 
 
 
 ```{r}
 # Use model to make prediction on test data set
-predict(game_fit,new_data = test_data)
+predict(fit_cv,new_data = test_data)
 
-game_aug = augment(game_fit,test_data)
+# Select best model based on ROC-AUC score
+fit_cv %>%
+  select_best(metric = "roc_auc") -> best_fit
+
+best_fit$.config %>%
+  collect_predictions()
+
+
+game_aug = augment(best_fit$.config,test_data)
+
+
 
 game_aug %>%
   select(week,season,home_team,away_team,.pred_TRUE,home_win,home_score,away_score) %>%
