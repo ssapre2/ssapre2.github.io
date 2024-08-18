@@ -152,8 +152,7 @@ nfl_game_results %>%
 
 # Check for stragglers
 nfl_game_results %>%
-  anti_join(cum_avgs, by = c('game_id','season','home_team' = 'team','week')) %>%
-  nrow()
+  anti_join(cum_avgs, by = c('game_id','season','home_team' = 'team','week')) -> unplayed_games
 
 # Join previous season's results
 #w_avgs %>%
@@ -199,11 +198,6 @@ matchup_full %>%
   select(-c(home_score,away_score,overtime,home_team,away_team,away_qb_name,home_qb_name)) -> matchup_ready
 ```
 
-Now, let's look for the most model-ready variables.
-
-```{r}
-colSums(is.na(matchup_ready))
-```
 
 Looks like there are a few varibles with several na's. Though we'd like to keep the "lag" columns that we created. 
 
@@ -233,10 +227,6 @@ train_data <- training(splits)
 test_data  <- testing(splits)
 ```
 
-
-```{r}
-colSums(is.na(train_data))
-```
 
 Alright, now that we have our training data ready, let's leverage the power of `tidymodels` to continue our preprocessing. I'm sure, you noticed quite a few variables still containing missing values.
 
