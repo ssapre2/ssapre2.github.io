@@ -165,7 +165,7 @@ nfl_game_results %>%
 
 # Indicate whether home team won
 w_avgs %>%
-  mutate(home_win = result > 0) -> matchups
+  mutate(home_win = as.numeric(result > 0)) -> matchups
 ```
 
 
@@ -176,10 +176,6 @@ matchups %>%
   left_join(injuries_position,by = c('season','home_team'='club_code','week')) %>%
   left_join(injuries_position,by = c('season','away_team'='club_code','week'),suffix = c('_home','_away')) %>%
   mutate(across(starts_with('injured_'), ~replace_na(.x, 0))) -> matchup_full
-
-matchup_full %>%
-  # Transform outcome into factor variable
-  mutate(home_win = as.factor(home_win)) -> matchup_full
 ```
 
 
@@ -191,25 +187,22 @@ And ... BOOM! We have a dataset with game matchups and some features to start ou
 
 Before we do any preprocessing, let's split the data.
 
-First let's remove columns that might leak info to the model. Remember the model must only use information available prior to kickoff
+First let's remove columns that might leak info to the model. Remember the model must only use information available prior to kickoff. We also want to remove some hi
 
 ```{r}
 matchup_full %>%
-  select(-c(home_score,away_score,overtime,home_team,away_team,away_qb_name,home_qb_name)) -> matchup_ready
+  select(-c(home_score,away_score,overtime,home_team,away_team,away_qb_name,home_qb_name,referee,stadium,home_coach,away_coach,ftn,espn,old_game_id,gsis,nfl_detail_id,pfr,pff,result)) -> matchup_ready
 ```
 
 
 Looks like there are a few varibles with several na's. Though we'd like to keep the "lag" columns that we created. 
 
 ```{r}
-colnames(matchup_ready[colSums(is.na(matchup_ready)) > 178]) -> columns_to_delete
-columns_to_delete
-
 # Remove columns
 matchup_ready = matchup_ready%>%
   # Transform outcome into factor variable
-  mutate(home_win = as.factor(home_win)) %>%
-  select(-c(columns_to_delete)) 
+  select(where(is.numeric),game_id) %>% 
+  mutate(home_win = as.factor(home_win)) 
 ```
 
 What about other NAs? There are still some left. For the purpose of this exercise, let's remove them with na.omit(). This is a bad idea as it leaves potentially useful data on the table.
@@ -222,30 +215,45 @@ What about other NAs? There are still some left. For the purpose of this exercis
 #test_data <- matchup_full[-trainIndex, ] %>%
   # Remove first season for now
 #  filter(season != 2011)
-splits = initial_split(matchup_full)
+splits = initial_split(matchup_ready)
 train_data <- training(splits)
 test_data  <- testing(splits)
 ```
 
 
+Let's checkout the variables avaialable to us.
+
+```{r}
+colnames(train_data)
+```
+Off the bat we see a lot of variables that we ourselves created. Do we really need that many variables tracking injured players? Probably not, but let's continue with them for now.
+
+
 Alright, now that we have our training data ready, let's leverage the power of `tidymodels` to continue our preprocessing. I'm sure, you noticed quite a few variables still containing missing values.
+
+Let's check the missingness of our training data using `naniar`.
+
+
+```{r}
+library(naniar)
+
+gg_miss_var(x = train_data,show_pct = T)
+
+```
+
+It looks like our custom variables have some missingess as well as some wind and temperature variables.
 
 
 ```{r}
 library('tidymodels')
 
-rec_impute = recipe(formula = home_win ~
-                      game_id +
-                      cum_score_lag_1_home +
-                 cum_opp_lag_1_home + cum_score_lag_1_away +
-                 cum_opp_lag_1_away + 
-                 cum_win_pct_lag_1_home +
-                 cum_win_pct_lag_1_away,
+rec_impute = recipe(formula = home_win ~ .,
                  data = train_data) %>%
   #create ID role (do not remove) game ID
   update_role(game_id, new_role = "ID") %>%
   #impute
-  step_impute_median(starts_with('cum_'))
+  #step_impute_median(starts_with('cum_'))
+  step_impute_median(starts_with('cum_'),'wind','temp')
 
 # Create recipe to for moneyline model
 
@@ -267,15 +275,16 @@ tidy(imp_models,number = 1)
 Ahh finally, now we can get to the actual model building.... which we'll do in about 3 lines of code.
 
 ```{r}
+library('glmnet')
 # Penalized Linear Regression
 # Mixture = 1 means pure lasso
 lr_mod <- 
-  logistic_reg() %>% 
-  set_engine("glm")
+  logistic_reg(mixture = 0.05,penalty = 1) %>% 
+  set_engine("glmnet")
 
 ```
 
-
+And that's it! We'll start off with a basic logistic regression. With a few tunable (though we won't be tuning in this post) parameters
 
 ```{r}
 # Create folds for cross-validation
@@ -296,7 +305,6 @@ game_pred_wflow <-
 
 
 ```{r}
-library('glmnet')
 
 prep(rec_impute,training = train_data)
 
@@ -331,6 +339,14 @@ final_wf = game_pred_wflow %>%
 final_fit <- 
   final_wf %>%
   last_fit(split = splits) 
+```
+
+
+```{r}
+final_fit %>%
+  extract_fit_engine() %>%
+  tidy() %>%
+  rename(penalty = lambda)
 ```
 
 
