@@ -114,8 +114,8 @@ First, we load in depth charts and injury info because we want to know who will 
 
 
 ```{r}
-dc = load_depth_charts(seq(2011,most_recent_season()-1))
-injuries = load_injuries(seq(2011,most_recent_season()-1))
+dc = load_depth_charts(seq(2011,most_recent_season()))
+injuries = load_injuries(seq(2011,most_recent_season()))
 ```
 
 
