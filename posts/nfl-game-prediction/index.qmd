@@ -114,8 +114,8 @@ First, we load in depth charts and injury info because we want to know who will 
 
 
 ```{r}
-dc = load_depth_charts(seq(2011,most_recent_season()))
-injuries = load_injuries(seq(2011,most_recent_season()))
+dc = load_depth_charts(seq(2011,most_recent_season()-1))
+injuries = load_injuries(seq(2011,most_recent_season()-1))
 ```
 
 
@@ -215,7 +215,7 @@ What about other NAs? There are still some left. For the purpose of this exercis
 #test_data <- matchup_full[-trainIndex, ] %>%
   # Remove first season for now
 #  filter(season != 2011)
-splits = initial_split(matchup_ready)
+splits = initial_split(matchup_ready,prop = 0.7)
 train_data <- training(splits)
 test_data  <- testing(splits)
 ```
@@ -253,7 +253,7 @@ rec_impute = recipe(formula = home_win ~ .,
   update_role(game_id, new_role = "ID") %>%
   #impute
   #step_impute_median(starts_with('cum_'))
-  step_impute_median(starts_with('cum_'),'wind','temp')
+  step_impute_median(all_numeric_predictors())
 
 # Create recipe to for moneyline model
 
@@ -263,7 +263,15 @@ tidy(rec_impute, number = 1)
 ```
 
 ```{r}
-imp_models <- prep(rec_impute, training = train_data)
+imp_models <- rec_impute %>%
+  check_missing(all_numeric_predictors()) %>%
+  prep(training = train_data)
+
+# Check if imputation worked
+imp_models %>%
+  bake(train_data) %>%
+  is.na() %>%
+  colSums()
 
 tidy(imp_models,number = 1)
 ```
@@ -284,7 +292,7 @@ lr_mod <-
 
 ```
 
-And that's it! We'll start off with a basic logistic regression. With a few tunable (though we won't be tuning in this post) parameters
+And that's it! We'll start off with a basic logistic regression. With a few tunable (though we won't be tuning in this post) parameters.
 
 ```{r}
 # Create folds for cross-validation
@@ -305,8 +313,6 @@ game_pred_wflow <-
 
 
 ```{r}
-
-prep(rec_impute,training = train_data)
 
 fit_cv = game_pred_wflow %>%
   fit_resamples(folds)
