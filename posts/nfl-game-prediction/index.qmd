@@ -215,7 +215,10 @@ What about other NAs? There are still some left. For the purpose of this exercis
 #test_data <- matchup_full[-trainIndex, ] %>%
   # Remove first season for now
 #  filter(season != 2011)
-splits = initial_split(matchup_ready,prop = 0.7)
+matchups24 = matchup_ready %>% filter(season == 2024)
+splits = matchup_ready %>% 
+  filter(season != 2024) %>%
+  initial_split(prop = 0.7)
 train_data <- training(splits)
 test_data  <- testing(splits)
 ```
@@ -345,8 +348,12 @@ final_wf = game_pred_wflow %>%
 final_fit <- 
   final_wf %>%
   last_fit(split = splits) 
+
+final_model = extract_workflow(final_fit)
 ```
 
+
+Get variable estimates and penalty terms.
 
 ```{r}
 final_fit %>%
@@ -359,36 +366,27 @@ final_fit %>%
 
 
 ```{r}
-# Use model to make prediction on test data set
-predict(fit_cv,new_data = test_data)
+# Use final model to make prediction on test data set
+predict(final_model,new_data = test_data)
 
-# Select best model based on ROC-AUC score
-fit_cv %>%
-  select_best(metric = "roc_auc") -> best_fit
-
-best_fit$.config %>%
-  collect_predictions()
-
-
-game_aug = augment(best_fit$.config,test_data)
+# Align predictions to test dataset
+predicted_df = augment(final_model,test_data)
 
 
 
-game_aug %>%
-  select(week,season,home_team,away_team,.pred_TRUE,home_win,home_score,away_score) %>%
-  arrange(desc(.pred_TRUE))
+predicted_df
 ```
 
 
 ```{r}
-game_aug %>% 
-  roc_curve(truth = home_win, .pred_TRUE) %>% 
+predicted_df%>% 
+  roc_curve(truth = home_win, .pred_1) %>% 
   autoplot()
 
 
-game_aug %>% select(.pred_class,home_win)
+predicted_df %>% select(.pred_class,home_win)
 # Plot results by week
-game_aug %>%
+predicted_df %>%
   group_by(week) %>%
   summarise(acc = sum(.pred_class== home_win)/n(), n= n()) -> acc_by_week
 
