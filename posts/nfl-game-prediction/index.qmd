@@ -376,35 +376,6 @@ predicted_df
 ```
 
 
-```{r}
-predicted_df%>% 
-  roc_curve(truth = home_win, .pred_0) %>% 
-  autoplot()
-
-
-predicted_df %>% select(.pred_class,home_win)
-# Plot results by week
-predicted_df %>%
-  group_by(week) %>%
-  summarise(acc = sum(.pred_class== home_win)/n(), n= n()) -> acc_by_week
-
-acc_by_week
-
-acc_by_week %>%
-  ggplot(aes(x = week, y = acc)) +
-  geom_col() + 
-  geom_smooth()
-
-game_aug %>%
-  group_by(season) %>%
-  summarise(acc = sum(.pred_class== home_win)/n(), n= n()) -> acc_by_season
-
-acc_by_season
-
-acc_by_season %>%
-  ggplot(aes(x = season, y = acc)) +
-  geom_col() 
-```
 
 Looks like predictions get slightly stronger throughout season. Sample size is small for end of season.
 
