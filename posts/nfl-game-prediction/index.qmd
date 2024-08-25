@@ -327,11 +327,11 @@ Check for best model fit. It looks like using ROC-AUC and accuracy agree that th
 
 ```{r}
 collect_metrics(fit_cv)
-fit_cv %>%
-  show_best(metric = "roc_auc") -> best_fit
+#fit_cv %>%
+#  show_best(metric = "roc_auc") -> best_fit
 
-fit_cv %>%
-  show_best(metric = "accuracy") 
+##fit_cv %>%
+#  show_best(metric = "accuracy") 
 ```
 
 
@@ -340,23 +340,24 @@ Extract best model fit.
 
 ```{r}
 final_wf = game_pred_wflow %>%
-  finalize_workflow(best_fit)
+  last_fit(splits)
+  #finalize_workflow(best_fit)
 ```
 
 
 ```{r}
-final_fit <- 
-  final_wf %>%
-  last_fit(split = splits) 
+# final_fit <- 
+#   final_wf %>%
+#   last_fit(split = splits) 
 
-final_model = extract_workflow(final_fit)
+final_model = extract_workflow(final_wf)
 ```
 
 
 Get variable estimates and penalty terms.
 
 ```{r}
-final_fit %>%
+final_model %>%
   extract_fit_engine() %>%
   tidy() %>%
   rename(penalty = lambda)
@@ -366,20 +367,37 @@ final_fit %>%
 
 
 ```{r}
-# Use final model to make prediction on test data set
-predict(final_model,new_data = test_data)
 
 # Align predictions to test dataset
-predicted_df = augment(final_model,test_data)
+predicted_df = augment(final_model,test_data) 
+```
 
-predicted_df
+Now, so we get a sample boost, let's retrain the model on the full training sample.
+
+```{r hide = T}
+
+# Extract model specs
+final_model %>%
+  extract_spec_parsnip() -> final_specs
+
+# Update workflow object and retrain on full training set w/ same parameters
+game_pred_wflow %>%
+  update_model(spec = final_specs) %>%
+  # Bind test and training data together
+  fit(data = cbind(train_data,test_data))-> final_flow
+
 ```
 
 
 
-Looks like predictions get slightly stronger throughout season. Sample size is small for end of season.
+Let's now save the model for future use and investigation.
+
+```{r}
+
+final_model %>%
+  save(file = "gamePred_model2024.rda")
 
 
-
+```
 
 
