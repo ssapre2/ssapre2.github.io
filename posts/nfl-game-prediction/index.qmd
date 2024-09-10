@@ -2,7 +2,7 @@
 title: "Predicting NFL Game Outcomes with nflfastR"
 author: "Sameer Sapre"
 date: "2024-06-30"
-categories: [news, code, analysis]
+categories: [news, code, analysis] 
 image: "nflfastR.png"
 execute: 
   warning: false
@@ -12,26 +12,23 @@ page-layout: full
 
 ## Intro
 
-Hello everyone! Today I want to share a quick tutorial on using `nflreadR` to build a simple game outcome model.
+Hello everyone! Today I want to share a tutorial on using `nflreadR` to read historic NFL results and model game outcomes with `tidymodels`.
 
-First, a quick introduction of `nflreadR` - it's part of the `nflverse` family of packages in R that all easily and efficiently obtaining data from NFL games. In this post, we'll be using its suite of functions to get the data we need to build a predictive model.
-
-First, let's load in some important packages. We'll load in the `tidyverse` for data cleaning and manipulation. The `caret` and `lme4` packages for our model-building.
+First, a quick introduction of the R packages we'll use. `nflreadR` is a part of the `nflverse` family of packages that easily and efficiently obtain data from NFL games. This includes past games results and statistics. In this post, we'll be using its suite of functions to get the data we need to build a simple predictive model. We'll also use the `tidymodels` package to setup our model and `tidyverse` for data cleaning and manipulation. 
 
 ```{r}
 # install and load packages
 #install.packages("nflreadr")
 library('nflreadr')
-library('lme4')
-library('caret')
 library("tidyverse")
 library('pROC')
+library('tidymodels')
 
 ```
 
 ## Load Data
 
-Now that we have the relevant packages loaded, let's get started getting our data together. Starting with game data, we'll pull game results from 2011 - 2021. Here, we see that we get a schedule where each row (record) represents a game. There's a home and away team, corresponding scores, and more for each game.
+Now that we have the relevant packages loaded, let's get started getting our data together. Starting with game data, we'll pull game results from 2011 - 2021. Here, we see that we get a schedule where each row (record) represents a game. There's a home and away team, corresponding scores, and more contextual information for each game.
 
 ```{r}
 # Scrape schedule Results
@@ -40,7 +37,7 @@ head(nfl_game_results)
 ```
 
 
-We've loaded our schedules in with some interesting variables to use in our model. However, it's not quite in the format we need it to be. Ideally, we'd like to feed in 2 games and have the model give us a winner.
+We've loaded our schedules in with some interesting variables to use in our model. However, it's not quite in the format we need it to be. Ideally, we'd like to feed in 2 teams and have the model give us a winner.
 
 ```{r}
 nfl_game_results %>%
@@ -61,38 +58,35 @@ Let's use `pivot_longer()` to rearrange our dataset and select some simple varia
 
 Our goal is to be able to predict the outcome of each. To do that, we need to think about what impacts the outcome of a game before teams even take the field. 
 
-In the case of an NFL game it could things like player skill level, how far a team has to travel, injuries, even the food that players ate the night before. Using `nflreadr` we can see that there are tons of features we could see impacting the game such as .....
+In the case of an NFL game it could be things like player skill level, how far a team has to travel, injuries, even the food that players ate the night before. Using `nflreadr` we can see that there are several variables that can potentially impact the game's outcome from injuries to previous results.
 
 
-First, let's start with what I think could have the biggest impact on ... team strength! 
+We'll start off by pulling in previous_results. By using previous results, we can hopefully capture a team's quality as a predictor for how they will perform in the next game. There are several ways to quantify team strength, some more complex than others, but for this tutorial, we will use cumulative results as a measure of team strength. The results will be in the form of cumulative points scored/allowed and winning percentage leading up to the game.
 
-There are several ways to quantify team strength, some more complex then others, but for this quick tutorial, we will use recent results as a measure of team strength. The results will be in the form of Cumulative points scored/allowed and winning percentage leading up to the game.
-
-Then, we'll create some features...
-
-First, cumulative points.
 
 ```{r}
 team_games %>%
   arrange(week) %>%
   group_by(season,team) %>%
-  mutate(cum_score_mean = cummean(team_score),
-          cum_score_opp = cummean(opp_score),
-          cum_wins = cumsum(team_score > opp_score),
-          cum_losses = cumsum(team_score < opp_score),
-          cum_ties = cumsum(team_score == opp_score),
-         cum_win_pct = cum_wins / (cum_wins + cum_losses),
-         cum_win_pct_lag_1 = lag(cum_win_pct,1),
-         cum_score_lag_1 = lag(cum_score_mean,1),
-         cum_opp_lag_1 = lag(cum_score_opp,1)
+  # For each team's season calculate the cumulative scores for after each week
+  mutate(cumul_score_mean = cummean(team_score),
+          cumul_score_opp = cummean(opp_score),
+          cumul_wins = cumsum(team_score > opp_score),
+          cumul_losses = cumsum(team_score < opp_score),
+          cumul_ties = cumsum(team_score == opp_score),
+         cumul_win_pct = cumul_wins / (cumul_wins + cumul_losses),
+         # Create the lag variable
+         cumul_win_pct_lag_1 = lag(cumul_win_pct,1),
+         cumul_score_lag_1 = lag(cumul_score_mean,1),
+         cumul_opp_lag_1 = lag(cumul_score_opp,1)
          ) %>%
   # Non-lag variables leak info
   select(week,game_id,contains('lag_1')) %>%
-  ungroup() -> cum_avgs
+  ungroup() -> cumul_avgs
 ```
 
 
-Win percentage.
+Let's also calculate winning percentage as a feature.
 
 ```{r ignore = TRUE}
 team_games %>%
@@ -108,12 +102,12 @@ team_games %>%
   ungroup() -> team_win_pct
 ```
 
-This should be a good start, but I still feel like something is missing. If I'm trying to predict who will win the game, I want to see the injury report. I want to know who's actually in the game. Thankfully `nflreadr` provides that info.
+This should be a good start, but I still feel like something is missing. Football is a dangerous game and players regularly get injured. Thankfully `nflreadr` provides weekly injury reports. Let's try incorporating that into our model.
 
-First, we load in depth charts and injury info because we want to know who will be injured, but also if they play an important role on their team. While it would be helpful to know which Niners RBs are out, it would probably helpful know if it's CMc or not.
 
 
 ```{r}
+# Load depth charts and injury reports
 dc = load_depth_charts(seq(2011,most_recent_season()))
 injuries = load_injuries(seq(2011,most_recent_season()))
 ```
@@ -126,6 +120,7 @@ injuries %>%
 dc %>% 
   filter(depth_team == 1) -> starters
 
+# Determine roster position of injured players
 starters %>%
   select(-c(last_name,first_name,position,full_name)) %>%
   inner_join(out_inj, by = c('season','club_code' = 'team','gsis_id','game_type','week')) -> injured_starters
@@ -141,18 +136,18 @@ head(injuries_position)
 
 ```
 
-Alright, now we have some flags for injured starter at each position. Coming up, we need to bring all of our new features together.
+Alright, now we have some flags for injured starter at each position. Next, we need to bring all of our new features together.
 
 ## Joins
 
 ```{r}
 nfl_game_results %>%
-  inner_join(cum_avgs, by = c('game_id','season','week','home_team' = 'team')) %>%
-  inner_join(cum_avgs, by = c('game_id','season','week','away_team' = 'team'),suffix = c('_home','_away'))-> w_avgs
+  inner_join(cumul_avgs, by = c('game_id','season','week','home_team' = 'team')) %>%
+  inner_join(cumul_avgs, by = c('game_id','season','week','away_team' = 'team'),suffix = c('_home','_away'))-> w_avgs
 
 # Check for stragglers
 nfl_game_results %>%
-  anti_join(cum_avgs, by = c('game_id','season','home_team' = 'team','week')) -> unplayed_games
+  anti_join(cumul_avgs, by = c('game_id','season','home_team' = 'team','week')) -> unplayed_games
 
 # Join previous season's results
 #w_avgs %>%
@@ -180,14 +175,14 @@ matchups %>%
 
 
 
-And ... BOOM! We have a dataset with game matchups and some features to start out. Feel free to peruse the data to find potential features to include in our Model. 
+And ... BOOM! We have a dataset with game-by-game matchups and some features to start out. Feel free to peruse the data to find potential features to include in our Model. 
 
 
 # Building the Model
 
 Before we do any preprocessing, let's split the data.
 
-First let's remove columns that might leak info to the model. Remember the model must only use information available prior to kickoff. We also want to remove some hi
+First, let's remove columns that might leak info to the model. Remember the model must only use information available prior to kickoff.
 
 ```{r}
 matchup_full %>%
@@ -195,7 +190,7 @@ matchup_full %>%
 ```
 
 
-Looks like there are a few varibles with several na's. Though we'd like to keep the "lag" columns that we created. 
+
 
 ```{r}
 # Remove columns
@@ -205,16 +200,12 @@ matchup_ready = matchup_ready%>%
   mutate(home_win = as.factor(home_win)) 
 ```
 
-What about other NAs? There are still some left. For the purpose of this exercise, let's remove them with na.omit(). This is a bad idea as it leaves potentially useful data on the table.
+
 
 
 ```{r}
 # Split Data
-#trainIndex <- createDataPartition(matchup_full$home_win, p = 0.7, list = FALSE)
-#train_data <- matchup_full[trainIndex, ]
-#test_data <- matchup_full[-trainIndex, ] %>%
-  # Remove first season for now
-#  filter(season != 2011)
+
 matchups24 = matchup_ready %>% filter(season == 2024)
 splits = matchup_ready %>% 
   filter(season != 2024) %>%
@@ -229,12 +220,10 @@ Let's checkout the variables avaialable to us.
 ```{r}
 colnames(train_data)
 ```
-Off the bat we see a lot of variables that we ourselves created. Do we really need that many variables tracking injured players? Probably not, but let's continue with them for now.
 
+Off the bat we see a lot of variables that we created. Do we really need that many variables tracking injured players? Probably not, but we'll let the model handle this issue later on.
 
-Alright, now that we have our training data ready, let's leverage the power of `tidymodels` to continue our preprocessing. I'm sure, you noticed quite a few variables still containing missing values.
-
-Let's check the missingness of our training data using `naniar`.
+What about NAs? You may have noticed quite a few variables still containing missing values. We can turn to the package `naniar` to investigate the missingness.
 
 
 ```{r}
@@ -244,7 +233,7 @@ gg_miss_var(x = train_data,show_pct = T)
 
 ```
 
-It looks like our custom variables have some missingess as well as some wind and temperature variables.
+It looks like our custom variables have some missingess as well as some wind and temperature variables. There are several ways to deal with this. However, we will use a simple imputation method as provided by `tidymodels`.
 
 
 ```{r}
@@ -252,10 +241,9 @@ library('tidymodels')
 
 rec_impute = recipe(formula = home_win ~ .,
                  data = train_data) %>%
-  #create ID role (do not remove) game ID
+  #create ID role (do not remove) game ID. We'll use this to match predictions to specific games
   update_role(game_id, new_role = "ID") %>%
-  #impute
-  #step_impute_median(starts_with('cum_'))
+  #for each numeric variable/feature, replace any NA's with the median value of that variable/feature
   step_impute_median(all_numeric_predictors())
 
 # Create recipe to for moneyline model
@@ -264,6 +252,8 @@ rec_impute = recipe(formula = home_win ~ .,
 tidy(rec_impute, number = 1)
 
 ```
+
+Here, we can see what the medians (NA-filler) values for each predictor.
 
 ```{r}
 imp_models <- rec_impute %>%
@@ -295,13 +285,16 @@ lr_mod <-
 
 ```
 
-And that's it! We'll start off with a basic logistic regression. With a few tunable (though we won't be tuning in this post) parameters.
+And that's it! We'll start off with a basic logistic regression. There are a few tunable (though we won't be tuning in this post) parameters, but we'll manually set them for this exercise.
+
+Next, we want to train our model with cross-validation, so that we can train and test against different samples to avoid an overfit model as much as we can. 
 
 ```{r}
 # Create folds for cross-validation
 folds <- vfold_cv(train_data)
 ```
 
+The `tidymodels` workflow helps organize the steps of the model creation and consolidate model objects. We won't go into details of workflows in this post, but there is plenty of online documentation.
 
 ```{r}
 # create a workflow using recipe and model objects
@@ -322,16 +315,11 @@ fit_cv = game_pred_wflow %>%
 
 ```
 
-Check for best model fit. It looks like using ROC-AUC and accuracy agree that the first model is the best. We
+Check for best model fit. It looks like using ROC-AUC and accuracy agree that the first model is the best.
 
 
 ```{r}
 collect_metrics(fit_cv)
-#fit_cv %>%
-#  show_best(metric = "roc_auc") -> best_fit
-
-##fit_cv %>%
-#  show_best(metric = "accuracy") 
 ```
 
 
@@ -341,15 +329,10 @@ Extract best model fit.
 ```{r}
 final_wf = game_pred_wflow %>%
   last_fit(splits)
-  #finalize_workflow(best_fit)
 ```
 
 
 ```{r}
-# final_fit <- 
-#   final_wf %>%
-#   last_fit(split = splits) 
-
 final_model = extract_workflow(final_wf)
 ```
 
@@ -399,5 +382,10 @@ final_model %>%
 
 
 ```
+
+
+
+We'll use this model to make predictions on future games and evaluate how our model performs in real-time.
+
 
 
