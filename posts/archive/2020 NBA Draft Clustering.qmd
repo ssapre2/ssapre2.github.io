@@ -1,9 +1,8 @@
-
 ---
-title: "Welcome To My Blog"
-author: "Tristan O'Malley"
-date: "2024-05-13"
-categories: [news]
+title: "Data-Driven Descriptions: Using Machine Learning to Profile 2020 NBA Draft Prospects"
+author: "Sameer Sapre"
+date: "2020-11-27"
+categories: [hoops]
 draft: TRUE
 ---
 
@@ -36,13 +35,14 @@ The 2020 prospect that fell into this group was Isaiah Joe, a 6’5 guard from A
 
 &nbsp;
 
-[caption id="attachment_24" align="aligncenter" width="843"]<a href="https://sites.psu.edu/sps5550/files/2020/10/group1.png"><img class="wp-image-24 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group1-1024x632.png" alt="group1" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 1[/caption]
+<a href="https://sites.psu.edu/sps5550/files/2020/10/group1.png"><img class="wp-image-24 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group1-1024x632.png" alt="group1" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 1
+
 <h5>Group 2: Old-school floor generals</h5>
 For group 2, we can find offensively efficient primary ballhandlers/creators given the groups relatively high effective field goal percentage, low usage percentage, and high assist percentage. Players in this group include Denzel Valentine, Derrick White, and Reggie Jackson as well as Scott Machado and Ray MacCallum. These players really made sense when looking at the group averages. They seemed to be making good decisions with the basketball, assisting a large amount of teammate field goals while using up a relatively small share of possessions (turnovers are also included in usage percentage). In addition, despite their lack of three-point shooting, they still shot the ball very efficiently inferring that they took smart shots and often found higher percentage looks. While no one assigned to this group is a star, there are still solid role players and starters in the NBA that carried this label in college.
 
 The only 2020 prospect assigned to this group was Oregon’s Payton Pritchard. who shot threes at a decently high rate (45.9 % as a senior) along with solid efficiency numbers.
 
-[caption id="attachment_25" align="aligncenter" width="843"]<a href="https://sites.psu.edu/sps5550/files/2020/10/group2.png"><img class="size-large wp-image-25" src="https://sites.psu.edu/sps5550/files/2020/10/group2-1024x632.png" alt="group2" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 2[/caption]
+<a href="https://sites.psu.edu/sps5550/files/2020/10/group2.png"><img class="size-large wp-image-25" src="https://sites.psu.edu/sps5550/files/2020/10/group2-1024x632.png" alt="group2" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 2
 
 &nbsp;
 
@@ -52,7 +52,7 @@ In group 3, we primarily found what some might call volume scorers. These player
 
 The 2020 prospects assigned to this group were Markus Howard (Marquette) who has a high usage rate (39.3), low DBPM (0.6) and decent efficiency (53 EFG%) and Anthony Edwards (Georgia: we’ll get to him later).
 
-[caption id="attachment_26" align="aligncenter" width="843"]<a href="https://sites.psu.edu/sps5550/files/2020/10/group3.png"><img class="wp-image-26 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group3-1024x632.png" alt="group 3" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 3[/caption]
+<a href="https://sites.psu.edu/sps5550/files/2020/10/group3.png"><img class="wp-image-26 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group3-1024x632.png" alt="group 3" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 3
 
 &nbsp;
 
@@ -64,19 +64,22 @@ Nevertheless, what you can take away from this group is that it's best players h
 
 2020 prospects include: Cassius Winston (Michigan State), Saben Lee (Vanderbilt), Jamil Wilson (Marquette), Cole Anthony (UNC), and Grant Riller (Charleston).
 
-[caption id="attachment_27" align="aligncenter" width="843"]<a href="https://sites.psu.edu/sps5550/files/2020/10/group4.png"><img class="wp-image-27 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group4-1024x632.png" alt="group4" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 4[/caption]
+<a href="https://sites.psu.edu/sps5550/files/2020/10/group4.png"><img class="wp-image-27 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group4-1024x632.png" alt="group4" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 4
+
 <h5>Group 5 – Lockdown Combo Guards</h5>
 Group 5 consists primarily of defensive specialists who were also the primary offensive facilitators on their team. Players of this group generally have high DBPM, and high AST% while not being the most efficient shooters. Notable NBA players include Marcus Smart, De’Aaron Fox, Shai Gilgeous-Alexander, Delon Wright, Matisse Thybulle, and Malcom Brogdon while fringe players include Tyrone Wallace, Travon Duval, Troy Caupain. There seem to be players like this available all over the draft from pick # 5 (Fox, Smart) to pick # 36 (Brogdon).  I am a big fan of this group because it contains many solid, underrated players. Shai Gilge..... is a fun player to watch and might become the cornerstone for the Thunder franchise. Marcus Smart is such a good defender that there was an argument that<a href="https://www.youtube.com/watch?v=3IWiADg7IiU"> he should've been the Defensive Player of the Year</a>. Finally, 2020 prospects to watch are Devon Dotson and Malachi Flynn who seemed to fit this statistical description pretty well.
 
 There were quite a few 2020 prospects assigned to this group including Ashton Hagans (Kentucky), Devon Dotson (Kansas: 4.8 DBPM), Malachi Flynn (4.1 DBPM, San Diego State), Josh Green (Arizona), Tre Jones (Duke), and Tyrese Maxey (Kentucky: 1.45 AST:TO Ratio).
 
-[caption id="attachment_28" align="aligncenter" width="843"]<a href="https://sites.psu.edu/sps5550/files/2020/10/group5.png"><img class="wp-image-28 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group5-1024x632.png" alt="group5" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 5[/caption]
+<a href="https://sites.psu.edu/sps5550/files/2020/10/group5.png"><img class="wp-image-28 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group5-1024x632.png" alt="group5" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 5
+
 <h5>Group 6 – Efficient 3 – and – D Wings</h5>
 Finally, players of Group 6 look like they can be true 3-and-D wings. These players had very high EFG% to go with a high 3PAr. They also carried a decent DBPM while carrying low usage and assist rates. Notable NBA players include Bradley Beal, Devin Booker, Joe Harris, Tyler Herro, Terrance Ross, as well as Lonzo Ball and Victor Oladipo (64.8% EFG, 6.2 DBPM). This may seem strange, but Lonzo Ball was very efficient as a shooter (66.8 % EFG), shot lots of 3s (56.6 % 3PAr), and was a great defender (3.9 DBPM), he just happened to also have a very high assist percentage (31.4%). Overall, these also seem to be the most "NBA ready"  players in the draft. Most of the top players of this group were starters right away. Most recently and perhaps notably, 19 year old Tyler Herro started every game for the Eastern Conference champion Miami Heat. This early success might be due to the shift of the game as a whole. As teams have started embracing the three-point shot as more of a necessity rather than an option, players who are good 3-point shooters have naturally become more valuable in today's game.
 
 2020 prospects include Tyrese Haliburton (Iowa State), Tyrell Terry (Stanford: 45.6% 3Par, 20 AST%, 53.5% EFG), Immanuel Quickly (Kentucky), Desmond Bane (TCU), and Cassius Stanley (Duke).
 
-[caption id="attachment_29" align="aligncenter" width="843"]<a href="https://sites.psu.edu/sps5550/files/2020/10/group6.png"><img class="size-large wp-image-29" src="https://sites.psu.edu/sps5550/files/2020/10/group6-1024x632.png" alt="group 1" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 6[/caption]
+<a href="https://sites.psu.edu/sps5550/files/2020/10/group6.png"><img class="size-large wp-image-29" src="https://sites.psu.edu/sps5550/files/2020/10/group6-1024x632.png" alt="group 1" width="843" height="520" /></a> Statistical profile of players in Cluster/Group 6
+
 <h3>Conclusion</h3>
 There are a few points to mention with these results. First, It looks like there are plenty of solid defenders to be found in this upcoming draft (both primary ballhandlers and shooters) by the large representation of 2020 prospects found in clusters 5 and 6. Second, some notable players I want to analyze further include Anthony Edwards and Tyrese Haliburton.
 
