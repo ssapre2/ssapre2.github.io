@@ -1,19 +1,5 @@
 [
   {
-    "objectID": "posts/welcome/index.html",
-    "href": "posts/welcome/index.html",
-    "title": "Welcome To My Blog",
-    "section": "",
-    "text": "This is the first post in a Quarto blog. Welcome!\n\nSince this post doesn’t specify an explicit image, the first image in the post will be used in the listing page of posts."
-  },
-  {
-    "objectID": "posts/Hoops/index.html",
-    "href": "posts/Hoops/index.html",
-    "title": "We’re Playing Basketball",
-    "section": "",
-    "text": "This is a post for my basketball post!"
-  },
-  {
     "objectID": "about.html",
     "href": "about.html",
     "title": "About",
@@ -25,7 +11,7 @@
     "href": "index.html",
     "title": "Sameer’s Blog",
     "section": "",
-    "text": "Predicting NFL Game Outcomes with nflfastR\n\n\n\n\n\n\nnews\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nJun 30, 2024\n\n\nSameer Sapre\n\n\n\n\n\n\n\n\n\n\n\n\nWe’re Playing Basketball\n\n\n\n\n\n\nNBA\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nMay 16, 2024\n\n\nSameer Sapre\n\n\n\n\n\n\n\n\n\n\n\n\nPost With Code\n\n\n\n\n\n\nnews\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nMay 16, 2024\n\n\nHarlow Malloc\n\n\n\n\n\n\n\n\n\n\n\n\nWelcome To My Blog\n\n\n\n\n\n\nnews\n\n\n\n\n\n\n\n\n\nMay 13, 2024\n\n\nTristan O’Malley\n\n\n\n\n\n\nNo matching items"
+    "text": "Predicting NFL Game Outcomes with nflfastR\n\n\n\n\n\n\nnews\n\n\ncode\n\n\nanalysis\n\n\n\n\n\n\n\n\n\nJun 30, 2024\n\n\nSameer Sapre\n\n\n\n\n\n\nNo matching items"
   },
   {
     "objectID": "posts/nfl-game-prediction/index.html",
@@ -33,13 +19,6 @@
     "title": "Predicting NFL Game Outcomes with nflfastR",
     "section": "",
     "text": "Hello everyone! Today I want to share a tutorial on using nflreadR to read historic NFL results and model game outcomes with tidymodels.\nFirst, a quick introduction of the R packages we’ll use. nflreadR is a part of the nflverse family of packages that easily and efficiently obtain data from NFL games. This includes past games results and statistics. In this post, we’ll be using its suite of functions to get the data we need to build a simple predictive model. We’ll also use the tidymodels package to setup our model and tidyverse for data cleaning and manipulation.\n\n# install and load packages\n#install.packages(\"nflreadr\")\nlibrary('nflreadr')\nlibrary(\"tidyverse\")\nlibrary('pROC')\nlibrary('tidymodels')"
-  },
-  {
-    "objectID": "posts/post-with-code/index.html",
-    "href": "posts/post-with-code/index.html",
-    "title": "Post With Code",
-    "section": "",
-    "text": "This is a post with executable code."
   },
   {
     "objectID": "posts/nfl-game-prediction/index.html#intro",
@@ -74,6 +53,6 @@
     "href": "posts/nfl-game-prediction/index.html#modeling",
     "title": "Predicting NFL Game Outcomes with nflfastR",
     "section": "Modeling",
-    "text": "Modeling\nAhh finally, now we can get to the actual model building…. which we’ll do in about 3 lines of code.\n\nlibrary('glmnet')\n# Penalized Linear Regression\n# Mixture = 1 means pure lasso\nlr_mod &lt;- \n  logistic_reg(mixture = 0.05,penalty = 1) %&gt;% \n  set_engine(\"glmnet\")\n\nAnd that’s it! We’ll start off with a basic logistic regression. There are a few tunable (though we won’t be tuning in this post) parameters, but we’ll manually set them for this exercise.\nNext, we want to train our model with cross-validation, so that we can train and test against different samples to avoid an overfit model as much as we can.\n\n# Create folds for cross-validation\nfolds &lt;- vfold_cv(train_data)\n\nThe tidymodels workflow helps organize the steps of the model creation and consolidate model objects. We won’t go into details of workflows in this post, but there is plenty of online documentation.\n\n# create a workflow using recipe and model objects\ngame_pred_wflow &lt;- \n  workflow() %&gt;% \n  add_model(lr_mod) %&gt;% \n  add_recipe(rec_impute)\n\n\nfit_cv = game_pred_wflow %&gt;%\n  fit_resamples(folds)\n\nCheck for best model fit. It looks like using ROC-AUC and accuracy agree that the first model is the best.\n\ncollect_metrics(fit_cv)\n\n# A tibble: 3 × 6\n  .metric     .estimator  mean     n std_err .config             \n  &lt;chr&gt;       &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;               \n1 accuracy    binary     0.624    10 0.0125  Preprocessor1_Model1\n2 brier_class binary     0.228    10 0.00186 Preprocessor1_Model1\n3 roc_auc     binary     0.718    10 0.0119  Preprocessor1_Model1\n\n\nExtract best model fit.\n\nfinal_wf = game_pred_wflow %&gt;%\n  last_fit(splits)\n\n\nfinal_model = extract_workflow(final_wf)\n\nGet variable estimates and penalty terms.\n\nfinal_model %&gt;%\n  extract_fit_engine() %&gt;%\n  tidy() %&gt;%\n  rename(penalty = lambda)\n\n# A tibble: 2,616 × 5\n   term         step estimate penalty dev.ratio\n   &lt;chr&gt;       &lt;dbl&gt;    &lt;dbl&gt;   &lt;dbl&gt;     &lt;dbl&gt;\n 1 (Intercept)     1    0.272    3.76 -4.72e-14\n 2 (Intercept)     2    0.270    3.42  1.84e- 3\n 3 (Intercept)     3    0.266    3.12  4.70e- 3\n 4 (Intercept)     4    0.262    2.84  8.13e- 3\n 5 (Intercept)     5    0.257    2.59  1.17e- 2\n 6 (Intercept)     6    0.252    2.36  1.53e- 2\n 7 (Intercept)     7    0.247    2.15  1.91e- 2\n 8 (Intercept)     8    0.241    1.96  2.30e- 2\n 9 (Intercept)     9    0.235    1.79  2.69e- 2\n10 (Intercept)    10    0.229    1.63  3.09e- 2\n# ℹ 2,606 more rows\n\n\n\n# Align predictions to test dataset\npredicted_df = augment(final_model,test_data) \n\nNow, so we get a sample boost, let’s retrain the model on the full training sample.\n\n# Extract model specs\nfinal_model %&gt;%\n  extract_spec_parsnip() -&gt; final_specs\n\n# Update workflow object and retrain on full training set w/ same parameters\ngame_pred_wflow %&gt;%\n  update_model(spec = final_specs) %&gt;%\n  # Bind test and training data together\n  fit(data = cbind(train_data,test_data))-&gt; final_flow\n\nLet’s now save the model for future use and investigation.\n\nfinal_model %&gt;%\n  save(file = \"gamePred_model2024.rda\")\n\nWe’ll use this model to make predictions on future games and evaluate how our model performs in real-time."
+    "text": "Modeling\nAhh finally, now we can get to the actual model building…. which we’ll do in about 3 lines of code.\n\nlibrary('glmnet')\n# Penalized Linear Regression\n# Mixture = 1 means pure lasso\nlr_mod &lt;- \n  logistic_reg(mixture = 0.05,penalty = 1) %&gt;% \n  set_engine(\"glmnet\")\n\nAnd that’s it! We’ll start off with a basic logistic regression. There are a few tunable (though we won’t be tuning in this post) parameters, but we’ll manually set them for this exercise.\nNext, we want to train our model with cross-validation, so that we can train and test against different samples to avoid an overfit model as much as we can.\n\n# Create folds for cross-validation\nfolds &lt;- vfold_cv(train_data)\n\nThe tidymodels workflow helps organize the steps of the model creation and consolidate model objects. We won’t go into details of workflows in this post, but there is plenty of online documentation.\n\n# create a workflow using recipe and model objects\ngame_pred_wflow &lt;- \n  workflow() %&gt;% \n  add_model(lr_mod) %&gt;% \n  add_recipe(rec_impute)\n\n\nfit_cv = game_pred_wflow %&gt;%\n  fit_resamples(folds)\n\nCheck for best model fit. It looks like using ROC-AUC and accuracy agree that the first model is the best.\n\ncollect_metrics(fit_cv)\n\n# A tibble: 3 × 6\n  .metric     .estimator  mean     n std_err .config             \n  &lt;chr&gt;       &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;               \n1 accuracy    binary     0.629    10 0.00854 Preprocessor1_Model1\n2 brier_class binary     0.228    10 0.00108 Preprocessor1_Model1\n3 roc_auc     binary     0.725    10 0.0122  Preprocessor1_Model1\n\n\nExtract best model fit.\n\nfinal_wf = game_pred_wflow %&gt;%\n  last_fit(splits)\n\n\nfinal_model = extract_workflow(final_wf)\n\nGet variable estimates and penalty terms.\n\nfinal_model %&gt;%\n  extract_fit_engine() %&gt;%\n  tidy() %&gt;%\n  rename(penalty = lambda)\n\n# A tibble: 3,596 × 5\n   term         step estimate penalty dev.ratio\n   &lt;chr&gt;       &lt;dbl&gt;    &lt;dbl&gt;   &lt;dbl&gt;     &lt;dbl&gt;\n 1 (Intercept)     1    0.239    3.85 -2.07e-14\n 2 (Intercept)     2    0.237    3.51  1.74e- 3\n 3 (Intercept)     3    0.234    3.20  4.75e- 3\n 4 (Intercept)     4    0.229    2.91  8.26e- 3\n 5 (Intercept)     5    0.225    2.66  1.19e- 2\n 6 (Intercept)     6    0.220    2.42  1.57e- 2\n 7 (Intercept)     7    0.215    2.20  1.95e- 2\n 8 (Intercept)     8    0.210    2.01  2.35e- 2\n 9 (Intercept)     9    0.205    1.83  2.75e- 2\n10 (Intercept)    10    0.199    1.67  3.16e- 2\n# ℹ 3,586 more rows\n\n\n\n# Align predictions to test dataset\npredicted_df = augment(final_model,test_data) \n\nNow, so we get a sample boost, let’s retrain the model on the full training sample.\n\n# Extract model specs\nfinal_model %&gt;%\n  extract_spec_parsnip() -&gt; final_specs\n\n# Update workflow object and retrain on full training set w/ same parameters\ngame_pred_wflow %&gt;%\n  update_model(spec = final_specs) %&gt;%\n  # Bind test and training data together\n  fit(data = cbind(train_data,test_data))-&gt; final_flow\n\nLet’s now save the model for future use and investigation.\n\nfinal_model %&gt;%\n  save(file = \"gamePred_model2024.rda\")\n\nWe’ll use this model to make predictions on future games and evaluate how our model performs in real-time."
   }
 ]
