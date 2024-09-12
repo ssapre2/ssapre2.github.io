@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.4.554">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Sameer Sapre">
+<meta name="dcterms.date" content="2020-11-27">
+
+<title>Blog - Data-Driven Descriptions: Using Machine Learning to Profile 2020 NBA Draft Prospects</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../../">
+<script src="../../site_libs/quarto-html/quarto.js"></script>
+<script src="../../site_libs/quarto-html/popper.min.js"></script>
+<script src="../../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../../site_libs/quarto-html/quarto-syntax-highlighting-dark.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../../site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="dark">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+
+<link rel="stylesheet" href="../../styles.css">
+</head>
+
+<body class="nav-fixed fullcontent">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top quarto-banner">
+    <nav class="navbar navbar-expand-lg " data-bs-theme="dark">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container mx-auto">
+    <a class="navbar-brand" href="../../index.html">
+    <span class="navbar-title">Blog</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item">
+    <a class="nav-link" href="../../about.html"> 
+<span class="menu-text">About</span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/"> <i class="bi bi-github" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com"> <i class="bi bi-twitter" role="img">
+</i> 
+<span class="menu-text"></span></a>
+  </li>  
+</ul>
+          </div> <!-- /navcollapse -->
+          <div class="quarto-navbar-tools">
+</div>
+      </div> <!-- /container-fluid -->
+    </nav>
+</header>
+<!-- content -->
+<header id="title-block-header" class="quarto-title-block default page-columns page-full">
+  <div class="quarto-title-banner page-columns page-full">
+    <div class="quarto-title column-body">
+      <h1 class="title">Data-Driven Descriptions: Using Machine Learning to Profile 2020 NBA Draft Prospects</h1>
+                                <div class="quarto-categories">
+                <div class="quarto-category">hoops</div>
+              </div>
+                  </div>
+  </div>
+    
+  
+  <div class="quarto-title-meta">
+
+      <div>
+      <div class="quarto-title-meta-heading">Author</div>
+      <div class="quarto-title-meta-contents">
+               <p>Sameer Sapre </p>
+            </div>
+    </div>
+      
+      <div>
+      <div class="quarto-title-meta-heading">Published</div>
+      <div class="quarto-title-meta-contents">
+        <p class="date">November 27, 2020</p>
+      </div>
+    </div>
+    
+      
+    </div>
+    
+  
+  </header><div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+<!-- margin-sidebar -->
+    
+<!-- main -->
+<main class="content quarto-banner-title-block" id="quarto-document-content">
+
+
+
+
+
+<p>If you have ever read, listened to, or watched analysis of an NBA draft you might have heard some strange sounding phrases like “3 – and – D wing”, “rim-protector”, “pure scorer”, “raw athlete”, and “playmaker” &nbsp;used to describe a player. What does that mean? It seems like these adjectives are all meant to do one thing - “profile” a player. Profiles are a quick summary or composite description of who a player is, expressing their playing style, strengths, weaknesses, role on a team, etc. From a fan’s perspective, these descriptions give us an idea of the player’s projected role on an NBA team without having to go back and watch hours of the player’s games. In addition, it might help us fans identify players that fit a need on our team. For example, if you’re a Cavs or Blazers fan, a solid perimeter defender may be what you’re looking for. If you’re a Sixers or Thunder fan, you might be interested in knowing the sharpshooters that could help your team. As a fan of both college basketball and the NBA Draft, these profiles and descriptions are intriguing, and I’d love to take a crack at developing my own. The only problem is that I haven’t watched nearly enough college hoops, nor have I been paying enough attention to this year’s prospects. Maybe I should leave the analysis to actual analysts on TV, but part of me still thinks I can come up with useful player profiles using data. In this post, I’ll attempt to address the idea of “profiling” NBA draft prospects (specifically, guards), using an unsupervised machine learning technique called hierarchical clustering and the season statistics of NCAA prospects dating back to 2011.</p>
+&nbsp;
+<h3 class="anchored">
+What is Clustering?
+</h3>
+<p>The reason I am using hierarchical clustering is because <strong>the clusters that a player is assigned to can reveal the defining characteristics of that player</strong>. Without getting too technical, hierarchical clustering is an unsupervised machine learning technique used to divide observations in a dataset into clusters or groups based on statistical similarity. By grouping similar players together and evaluating the groups, we can generalize the qualities of players in each group. For example, one group may consist of players with a high 3-point percentage and low assist percentage revealing that they were generally effective as off-ball shooters for their college team. Of course, not all players have skill sets that can be identified with a given set of statistics or any available statistics for that matter. However, that is one of the challenges of generalizing player profiles. In this analysis, I do my best to mitigate these issues, but there are still a few players whose resulting profiles don’t make a ton of sense.</p>
+<p>Unlike supervised models, trying to find out if the results of a cluster analysis are “good” doesn’t come down to prediction accuracy or error, but rather how similar observations are to others in their cluster and how different they are from those outside. There are ways to validate resulting clusters, like using Silhouette scores or Dunn’s Index, that judge if the resulting groups actually contain mathematically similar observations. If this is getting too technical, don’t worry, the bottom line is that players that are grouped together should generally share more in common then players not grouped together.</p>
+However, for this post, mathematically “good” results will not be prioritized over interpretability. In fact, my criteria for success is not technical at all. In order for this analysis to be a success, the resulting clusters/groups <strong>must be interpretable and m</strong><strong>ust not be indicative of NBA success. </strong>That means that each group of players should have defining characteristics that can be described using basketball terminology and that each group includes players with varying levels of NBA success. Again, the goal of this analysis is build profiles that describe a player, not predict his chances of success. By the way, if you haven’t already noticed I use “cluster” and “group” interchangeably, sorry for any confusion but they mean the same thing.
+<h3 class="anchored">
+Approach and Data
+</h3>
+<p>Rather than using only the college statistics of the 2020 class, I am including the college stats of current NBA players to make the resulting groups more interpretable. Of course, I will be using the average statistics of each group to get a better understanding of the group’s defining traits. However, by including current NBA players in the analysis, each group’s characteristics become more recognizable. For example, any group headlined by Buddy Hield or Joe Harris could probably be identified as a group consisting of primarily sharpshooters while a group including Matisse Thybulle and Marcus Smart could be thought of as a group of good on-ball defenders. In addition, the model does not consider the year that each player was drafted meaning that Anthony Edwards, Tre Jones, and Cole Anthony will be grouped together with similar players from previous draft classes. As a result, we’ll also get an idea of each 2020 draft class member’s NBA comparisons. Of course, there are always going to be players whose college profile is different from their NBA profile, but that doesn’t seem to affect the results too much.</p>
+<p>If you want to check out the technical details/data selection, it will be available on <a href="https://github.com/ssapre2/2020-NBA-Draft-Clustering/blob/master/README.md">GitHub</a>. Long story short, I used the statistics of the final college year of almost every single guard that has played in the NBA since 2011 as well as guards included in <a href="https://www.nbadraft.net/ranking/bigboard/">NBADraftNet.com’s</a> 2020 rankings. Unfortunately, this analysis does not include players that did not play in the NCAA. That means no LaMelo Ball, Killian Hayes, Theo Maldeon, or RJ Hampton nor does the analysis include any current players that played overseas instead of in college. That means players like Bogdan Bogdanovic, Dennis Schroder, or Emmanuel Mudiay will be left out as well.</p>
+<p>Next, as un-inspiring as it sounds, I decided to hand-pick statistics that I felt were most important when trying to discern the various roles and playing styles of guards among each other. The final set of statistics I used were assist percentage (AST %), usage percentage (USG%), three-point attempt rate (3PAr), effective-field goal percentage (EFG%), and defensive box-plus-minus (DBPM).</p>
+&nbsp;
+<h3 class="anchored">
+Results
+</h3>
+<p>The final model produced 6 clusters of players that generally make sense and can serve as statistical profiles. It was by no means a complete success as there were some players in questionable/interesting groups, but, as a whole, it wasn’t too difficult to come up with descriptions for each cluster using group averages and the players within them. Here is an overview of each group’s statistical profile.<a href="https://sites.psu.edu/sps5550/files/2020/10/all_groups.png"><img class="aligncenter size-large wp-image-23" src="https://sites.psu.edu/sps5550/files/2020/10/all_groups-1024x632.png" alt="allgroups" width="843" height="520"></a></p>
+&nbsp;
+<h5 class="anchored">
+Group 1: Low Efficiency 3 – and – D
+</h5>
+<p>In our first group, players tended to be solid defenders, but weren’t very efficient scorers, nor were they the primary creators for their team. The group includes notable NBA starters like Donovan Mitchell, Gary Harris, and Kentavious Caldwell-Pope, but also contained players that didn’t make much of an impact at the next level like Rawle Alkins, Aaron Harrison, and Malachi Richardson. The best-case scenarios for these guys don’t look too bad. Harris and KCP were both starters for the two Western Conference Finals teams with KCP going on to win the finals with LA as a key contributor on both ends. He was also part of one of the best defensive units in the league. It’s also surprising that Donovan Mitchell was included in this group. He has now become the offensive focal point of the Utah Jazz and an All-Star in the process of shedding this label. It’s also worth noting that all of the top 3 players are not known to be particularly lethal shooters, but tend to be streaky shooters capable of going on hot/cold stretches at a moment’s notice. Streaky shooters are notorious for their willingness to shoot despite their recent struggles. Therefore, the clustering did a good job of grouping players that will continue to exhibit a high three-point attempt rate regardless of the percentage they are shooting.</p>
+<p>The 2020 prospect that fell into this group was Isaiah Joe, a 6’5 guard from Arkansas whose efficiency (49.7 EFG%) isn’t great, but he did shoot a lot of threes (76.4 % 3PTAr).</p>
+<p>&nbsp;</p>
+<p><a href="https://sites.psu.edu/sps5550/files/2020/10/group1.png"><img class="wp-image-24 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group1-1024x632.png" alt="group1" width="843" height="520"></a> Statistical profile of players in Cluster/Group 1</p>
+<h5 class="anchored">
+Group 2: Old-school floor generals
+</h5>
+<p>For group 2, we can find offensively efficient primary ballhandlers/creators given the groups relatively high effective field goal percentage, low usage percentage, and high assist percentage. Players in this group include Denzel Valentine, Derrick White, and Reggie Jackson as well as Scott Machado and Ray MacCallum. These players really made sense when looking at the group averages. They seemed to be making good decisions with the basketball, assisting a large amount of teammate field goals while using up a relatively small share of possessions (turnovers are also included in usage percentage). In addition, despite their lack of three-point shooting, they still shot the ball very efficiently inferring that they took smart shots and often found higher percentage looks. While no one assigned to this group is a star, there are still solid role players and starters in the NBA that carried this label in college.</p>
+<p>The only 2020 prospect assigned to this group was Oregon’s Payton Pritchard. who shot threes at a decently high rate (45.9 % as a senior) along with solid efficiency numbers.</p>
+<p><a href="https://sites.psu.edu/sps5550/files/2020/10/group2.png"><img class="size-large wp-image-25" src="https://sites.psu.edu/sps5550/files/2020/10/group2-1024x632.png" alt="group2" width="843" height="520"></a> Statistical profile of players in Cluster/Group 2</p>
+<p>&nbsp;</p>
+&nbsp;
+<h5 class="anchored">
+Group 3 – High Volume Scorers
+</h5>
+<p>In group 3, we primarily found what some might call volume scorers. These players had a high usage rate and a low assist percentage suggesting that they used a large portion of their team’s possessions to shoot or turn it over. They also carried okay scoring efficiency and subpar defense. Notable NBA players include Buddy Hield, Damian Lillard, and Jamal Murray while fringe players include Xavier Munford, Rashad Vaughn, and Gian Clavall. It’s important to note that while the statistical profiles of players in this group don’t seem great, some of them have still gone on to become solid NBA contributors. Damian Lillard has become a superstar and can get quality shots from almost anywhere on the court. Hield, despite his high volume at Oklahoma, was still a very efficient shooter (0.623 EFG%) and was a key contributor for Sacramento before issues with the coaching staff. Finally, Jamal Murray exploded onto the scene in this year’s playoffs helping Denver to the Western Conference Finals with a ridiculous 62.6 True Shooting percentage and a stretch of 3 games in which he scored a total of 142 points.</p>
+<p>The 2020 prospects assigned to this group were Markus Howard (Marquette) who has a high usage rate (39.3), low DBPM (0.6) and decent efficiency (53 EFG%) and Anthony Edwards (Georgia: we’ll get to him later).</p>
+<p><a href="https://sites.psu.edu/sps5550/files/2020/10/group3.png"><img class="wp-image-26 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group3-1024x632.png" alt="group 3" width="843" height="520"></a> Statistical profile of players in Cluster/Group 3</p>
+<p>&nbsp;</p>
+&nbsp;
+<h5 class="anchored">
+Group 4 – Focal Points (… No pun intended)
+</h5>
+<p>Group 4 players looked clearly like high offensive load bearers as they had high usage and assist percentages. That combination signifies that much of the offense ran through them as they worked as the primary facilitators and shot at high volumes. Also, these guards didn’t take many threes, weren’t super-efficient, nor had great defensive numbers. Notable NBA include Trae Young, DeAngelo Russell, Ja Morant, Klay Thompson, and Dejounte Murray and fringe players Walt Lemon, Milton Doyle, and Mike James. Now you may be questioning Trae Young and Klay’s inclusion in this group, but both carried high offensive loads and weren’t that efficient, the only difference is that their three-point attempt rates were very high.</p>
+<p>Nevertheless, what you can take away from this group is that it’s best players have no issue handling the scoring and creation responsibilities at the next level. Trae Young and DeAngelo Russell are already All-Stars with high usage and assist rates while Ja Morant seems to be following a similar trajectory in Memphis. Maybe if a player like this is given the reigns on a team in need of someone to shoulder that load, they can thrive.</p>
+<p>2020 prospects include: Cassius Winston (Michigan State), Saben Lee (Vanderbilt), Jamil Wilson (Marquette), Cole Anthony (UNC), and Grant Riller (Charleston).</p>
+<p><a href="https://sites.psu.edu/sps5550/files/2020/10/group4.png"><img class="wp-image-27 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group4-1024x632.png" alt="group4" width="843" height="520"></a> Statistical profile of players in Cluster/Group 4</p>
+<h5 class="anchored">
+Group 5 – Lockdown Combo Guards
+</h5>
+<p>Group 5 consists primarily of defensive specialists who were also the primary offensive facilitators on their team. Players of this group generally have high DBPM, and high AST% while not being the most efficient shooters. Notable NBA players include Marcus Smart, De’Aaron Fox, Shai Gilgeous-Alexander, Delon Wright, Matisse Thybulle, and Malcom Brogdon while fringe players include Tyrone Wallace, Travon Duval, Troy Caupain. There seem to be players like this available all over the draft from pick # 5 (Fox, Smart) to pick # 36 (Brogdon).&nbsp; I am a big fan of this group because it contains many solid, underrated players. Shai Gilge….. is a fun player to watch and might become the cornerstone for the Thunder franchise. Marcus Smart is such a good defender that there was an argument that<a href="https://www.youtube.com/watch?v=3IWiADg7IiU"> he should’ve been the Defensive Player of the Year</a>. Finally, 2020 prospects to watch are Devon Dotson and Malachi Flynn who seemed to fit this statistical description pretty well.</p>
+<p>There were quite a few 2020 prospects assigned to this group including Ashton Hagans (Kentucky), Devon Dotson (Kansas: 4.8 DBPM), Malachi Flynn (4.1 DBPM, San Diego State), Josh Green (Arizona), Tre Jones (Duke), and Tyrese Maxey (Kentucky: 1.45 AST:TO Ratio).</p>
+<p><a href="https://sites.psu.edu/sps5550/files/2020/10/group5.png"><img class="wp-image-28 size-large" src="https://sites.psu.edu/sps5550/files/2020/10/group5-1024x632.png" alt="group5" width="843" height="520"></a> Statistical profile of players in Cluster/Group 5</p>
+<h5 class="anchored">
+Group 6 – Efficient 3 – and – D Wings
+</h5>
+<p>Finally, players of Group 6 look like they can be true 3-and-D wings. These players had very high EFG% to go with a high 3PAr. They also carried a decent DBPM while carrying low usage and assist rates. Notable NBA players include Bradley Beal, Devin Booker, Joe Harris, Tyler Herro, Terrance Ross, as well as Lonzo Ball and Victor Oladipo (64.8% EFG, 6.2 DBPM). This may seem strange, but Lonzo Ball was very efficient as a shooter (66.8 % EFG), shot lots of 3s (56.6 % 3PAr), and was a great defender (3.9 DBPM), he just happened to also have a very high assist percentage (31.4%). Overall, these also seem to be the most “NBA ready”&nbsp; players in the draft. Most of the top players of this group were starters right away. Most recently and perhaps notably, 19 year old Tyler Herro started every game for the Eastern Conference champion Miami Heat. This early success might be due to the shift of the game as a whole. As teams have started embracing the three-point shot as more of a necessity rather than an option, players who are good 3-point shooters have naturally become more valuable in today’s game.</p>
+<p>2020 prospects include Tyrese Haliburton (Iowa State), Tyrell Terry (Stanford: 45.6% 3Par, 20 AST%, 53.5% EFG), Immanuel Quickly (Kentucky), Desmond Bane (TCU), and Cassius Stanley (Duke).</p>
+<p><a href="https://sites.psu.edu/sps5550/files/2020/10/group6.png"><img class="size-large wp-image-29" src="https://sites.psu.edu/sps5550/files/2020/10/group6-1024x632.png" alt="group 1" width="843" height="520"></a> Statistical profile of players in Cluster/Group 6</p>
+<h3 class="anchored">
+Conclusion
+</h3>
+<p>There are a few points to mention with these results. First, It looks like there are plenty of solid defenders to be found in this upcoming draft (both primary ballhandlers and shooters) by the large representation of 2020 prospects found in clusters 5 and 6. Second, some notable players I want to analyze further include Anthony Edwards and Tyrese Haliburton.</p>
+<p>Edwards was placed in a group occupied primarily by volume scorers. He will be a top-3 pick, but will teams consider his lack of defensive impact (0.7 DBPM) and low efficiency (47.3% EFG)? Of course, players can improve and maybe the top of the draft is a perfect spot for high usage, low efficiency “projects”. Teams at the top of the draft may be more willing to give a longer leash to prospects and being on a bad team might give Edwards opportunities, in terms of volume, that could help him develop. Just look at fellow top-10 picks in his group – Damian Lillard, Buddy Hield, Jamal Murray, Brandon Knight, Austin Rivers. While Edwards’ future team hopes it’s not the latter two (By the way, Knight had a promising start to his career before injuries got in the way), the first three may be indicators of how his team should handle his development. For this reason, perhaps Minnesota, a team hoping to make a push for the playoffs and maximize the opportunity they have with KAT and DeAngelo Russell, should opt for someone who will not command a high volume. Honestly, the same can be said for Golden State, Edwards will likely have to cede volume to Klay, Steph, Draymond, and Andrew Wiggins and will also be expected to contribute immediately to a deep playoff push next year. I could see Charlotte, despite solid guard play from Devonte Graham and Terry Rozier this season, being a good fit for Edwards. They don’t seem close to competing for anything just yet and could be the perfect landing spot for Edwards to get the opportunities he needs to develop.</p>
+<p>In addition, the inclusion of Tyrese Haliburton as a 3 – and – D wing is also interesting. He has a high assist percentage (35%) and effective field-goal percentage (61.1%) while carrying a relatively low usage rate for a point guard (20.1%) and shot about half of his shots (50.8%) from downtown. This might mean that he has a versatile skill set and could serve a team in multiple ways in the NBA. For teams that already have young point guards like Chicago or New York, Haliburton might still be a good fit for operating in some sort of hybrid role. Even teams with a perceived need for a point guard like Detroit or Phoenix, could use him as their primary ballhandler.</p>
+<p>In conclusion, the groups produced by the hierarchical clustering model met the goals originally defined for them: they were interpretable, and each cluster contained players with different levels of NBA success. Of course, the results weren’t perfect as a few players seemed to be placed in groups unintuitively, but not all basketball players can be easily profiled with a small set of statistics. &nbsp;Nevertheless, I hope that this post provided a new perspective on player profiling using a more statistical approach.</p>
+<p>All data used for this project was obtained from Basketball-Reference.com.</p>
+
+
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>
