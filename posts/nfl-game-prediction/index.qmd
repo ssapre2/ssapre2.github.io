@@ -205,7 +205,7 @@ matchup_ready = matchup_ready%>%
 
 ```{r}
 # Split Data
-
+set.seed(123)
 matchups24 = matchup_ready %>% filter(season == 2024)
 splits = matchup_ready %>% 
   filter(season != 2024) %>%
