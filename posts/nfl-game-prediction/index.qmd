@@ -205,7 +205,7 @@ matchup_ready = matchup_ready%>%
 
 ```{r}
 # Split Data
-
+set.seed(123)
 matchups24 = matchup_ready %>% filter(season == 2024)
 splits = matchup_ready %>% 
   filter(season != 2024) %>%
@@ -377,9 +377,11 @@ Let's now save the model for future use and investigation.
 
 ```{r}
 
-final_model %>%
-  save(file = "gamePred_model2024.rda")
+library(yaml)
 
+final_flow %>%
+  extract_fit_parsnip() %>%
+  saveRDS(file = "gamePred_model2024.rda")
 
 ```
 
