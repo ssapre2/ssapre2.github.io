@@ -1,0 +1,19 @@
+---
+title: "NFL Game Prediction (Part 2)"
+author: "Sameer Sapre"
+date: "2024-09-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+In the previous post, we went over the basics of `tidymodels` and `nflreadr`. We made a simple game prediction model and with the NFL season underway, let's see if we can't check how our model does at predicting the games played so far.
+
+```{r cars}
+summary(cars)
+```
+
