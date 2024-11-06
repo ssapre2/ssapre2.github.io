@@ -1,0 +1,330 @@
+---
+title: "Predicting Wide Receiver Fantasy Points w/ slideR and Tidymodels"
+author: "Sameer Sapre"
+editor: visual
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r message=TRUE, warning=TRUE}
+library(tidyverse)
+library(nflreadr)
+library(tidymodels)
+library(nflfastR)
+```
+
+## Data Load
+
+```{r message=TRUE, warning=TRUE}
+stats24 = load_player_stats(2024)
+stats = load_player_stats(seasons = seq(2006,2023))
+pbp23 = load_pbp(2023)
+# Load next gen
+ng = load_nextgen_stats(stat_type = 'receiving') %>% 
+  # Filter on WRs ... only use weekly avg
+  filter(player_position == 'WR', week > 0) %>%
+  # Select non-overlapping stats from 'stats'
+  # YAC variables have NA for 0 receptions or no yac (ex. endzone TDs)
+  mutate(across(contains('_yac'),~ ifelse(is.na(.),0,.))) %>%
+  select(-c(player_display_name,player_position))
+
+load_nextgen_stats(seasons = T,stat_type = "receiving") -> all_ng
+
+dc = load_depth_charts(season = seq(2016,most_recent_season())) %>% filter(position == 'WR',formation == 'Offense') %>%
+  select(season,recent_team = club_code,week,season_type = game_type,player_id = gsis_id,depth_team)
+
+```
+
+```{r}
+# Filter for wide receiver plays
+wr_data <- stats %>%
+  filter(position == "WR") %>%
+  select(player_id,player_name,position,recent_team,season,week,season_type,
+         receptions:fantasy_points_ppr) %>%
+  # Receiving FP
+  mutate(rec_fp = (receiving_yards * 0.1) + (receiving_tds * 6) + (receptions * 0.5)) %>%
+  # Add depth chart status since we don't have participation data
+  left_join(y = dc,by = c('player_id','week','season','season_type',"recent_team")) %>%
+  # Only first 3 are counted so some players are NA'd if they're below 3rd on DC
+  left_join(y = ng, by = c('player_id'='player_gsis_id','week','season','season_type','recent_team' = 'team_abbr','receptions','targets')) %>%
+  replace_na(list(depth_team = '4')) %>%
+  mutate(depth_team = as.numeric(depth_team))
+
+  
+```
+
+Number of Snaps by offense ---------
+
+FFO (Comparison)
+
+```{r}
+
+read.csv('https://github.com/ffverse/ffopportunity/releases/download/latest-data/ep_weekly_2024.csv') -> ff_2024
+
+ff_2024 %>% filter(position == 'WR') %>% select(game_id,player_id,season,rec_fantasy_points,rec_fantasy_points_exp) %>%
+  metrics(truth = rec_fantasy_points,estimate = rec_fantasy_points_exp)
+
+```
+
+## Missingness
+
+Vizualize missingness in data. Check problematic columns and check removal scenarios.
+
+```{r}
+library(naniar)
+
+gg_miss_case(wr_data)
+
+gg_miss_var(wr_data)
+
+# What if we take out racr?
+
+wr_data %>%
+  filter(!is.na(racr),!is.na(avg_yac_above_expectation)) %>%
+  gg_miss_var()
+
+
+```
+
+## Time Weighting
+
+We want our predictions for each player to be based on their past performance. Ideally, we'd like the most recent performances to be weighed the heaviest. To do that, we can introduce a simple time-weighting scheme. In the function below, we take a data vector (ex. receptions) and return a weighted average based on the length of the vector.
+
+
+```{r}
+# Create Time Weighting 
+
+weighted_avg = function(metric_vector){
+  
+  # Take in sliding window of vector of chosen metric
+  n = length(metric_vector)
+
+  # Create Weights for each value based on recency
+  weights = seq(1,n)
+  
+  # Calculated weighted average
+  w_avg = sum(metric_vector * weights) / sum(weights)
+  
+  return(w_avg)
+
+}
+
+
+```
+
+Use Thomas Mock (slider package)
+
+```{r}
+library(TTR)
+library(slider)
+
+wr_data %>%
+  filter(!is.na(racr)) %>%
+  # Cannot use week  
+  group_by(player_id,season) %>%
+  arrange(week) %>%
+  # Weighted Avg
+  mutate(across(receptions:depth_team, ~ lag(slide_dbl(.x,.f = weighted_avg,.before = Inf,.complete = TRUE)),.names = "wt_{col}")) %>%
+  # Exp-ish mean
+  mutate(across(receptions:rec_fp, ~ lag(slide_dbl(.x,.f = exp_wt,.before = Inf,.complete = TRUE)),.names = "exp_{col}")) %>%
+  # Lag
+  mutate(across(receptions:rec_fp, ~lag(.x),.names = 'lag_{col}')) %>%
+  #mutate(depth_team = as.numeric(depth_team)) %>%
+  ungroup() %>%
+  mutate(fantasy_points = ifelse(fantasy_points < 0,0,fantasy_points),
+         log_fantasy_points = log(fantasy_points + 1)) %>%
+  # Need data, don't use week 1 for now
+  filter(week > 1) -> ema_wr
+
+```
+
+# Preprocess
+
+Created a dataset for weighted mean
+
+```{r}
+library(tidymodels)
+
+# Split
+
+set.seed(222)
+# Put 3/4 of the data into the training set 
+data_split <- ema_wr %>% 
+  # Don't use first week
+  filter(week >1)%>%
+  # Filter on relevant columns
+  select(starts_with('wt_'),log_fantasy_points,player_id,season,week,recent_team,
+         fantasy_points,fantasy_points_ppr) %>% 
+  # make split
+  initial_split( prop = 3/4)
+
+# Create data frames for the two sets:
+train_data <- training(data_split)
+test_data  <- testing(data_split)
+```
+
+```{r}
+wt_recipe = train_data %>%
+  recipe(log_fantasy_points ~ .,) %>%
+  update_role(c(player_id,recent_team,fantasy_points,fantasy_points_ppr),new_role = 'ID') %>%
+  # Generally not recommended to throw out all data, but for brevity, let's remove NAs
+  step_naomit(all_numeric_predictors()) 
+  # Remove zero variance predictors (ie. variables that contribute nothing to prediction)
+ # step_zv(all_predictors()) %>%
+ # step_center(all_numeric_predictors())
+#
+
+summary(wt_recipe)
+```
+
+```{r}
+test_data %>%
+  filter(!is.na(wt_receptions)) -> test_data
+
+sum(colSums(is.na(test_data)))
+```
+
+## Exponential model -------------------------------
+
+```{r}
+
+exp_recipe = train_data  %>%
+  recipe(log_fantasy_points ~ .,) %>%
+  update_role(c(player_id,recent_team,fantasy_points,fantasy_points_ppr),new_role = 'ID') %>%
+  # Generally not recommended to throw out all data, but for brevity, let's remove NAs
+  step_naomit(all_numeric_predictors()) %>%
+ # Remove zero variance predictors (ie. variables that contribute nothing to prediction)
+  step_zv(all_predictors()) %>%
+  step_center(all_numeric_predictors())
+
+
+#summary(exp_recipe)
+
+```
+
+# Cross-Validation + Tuning -------------
+
+## Create Model
+
+Create specifications for elastic net model using glmnet and tune
+
+## GLM --------------------------
+
+```{r}
+# Specify a penalized GLM model with tuning parameters
+glm_model <- linear_reg(penalty = tune(), mixture = tune()) %>%
+  set_engine("glmnet")
+
+# Define the parameter grid
+param_grid <- grid_regular(penalty(), mixture(), levels = 10)  # Adjust levels as needed
+
+# Set up cross-validation folds
+cv_folds <- vfold_cv(train_data, v = 5)
+
+# Create a workflow
+workflow <- workflow() %>%
+  add_recipe(exp_recipe) %>%
+  add_model(glm_model)
+
+# Tune the model
+tuned_results <- tune_grid(
+  workflow,
+  resamples = cv_folds,
+  grid = param_grid
+)
+
+
+```
+
+```{r}
+library(glmnet)
+#library(lightgbm)
+#library(bonsai)
+
+glm_spec <- linear_reg(
+  penalty = tune(),     # Lambda (regularization strength)
+  mixture = tune(),    # Alpha (0 = Ridge, 1 = Lasso, values in between = Elastic Net)
+    
+) %>%
+  set_engine("glmnet")
+
+glm_wflow <-
+  workflow() %>% 
+  add_recipe(exp_recipe) %>%
+  add_model(glm_spec)
+
+
+wr_folds <- vfold_cv(train_data, v = 5)
+
+# Tune the hyperparameters using a grid of values
+glm_tune_results <- tune_grid(
+  glm_wflow,
+  resamples = wr_folds,
+  grid = 10   # Number of tuning combinations to evaluate
+)
+```
+
+Tune Model w/ Cross Validation
+
+Examine Tuning Results
+
+```{r}
+# Show the tuning results
+glm_tune_results %>%
+  collect_metrics() %>%
+  filter(.metric == "rmse") %>%
+  arrange(mean)
+```
+
+Find the best parameters of the group
+
+```{r}
+# Select the best hyperparameters based on RMSE
+best_glm <- select_best(glm_tune_results, metric = 'rmse')
+
+# Finalize the workflow with the best hyperparameters
+final_glm_workflow <- finalize_workflow(glm_wflow, best_glm)
+
+best_glm
+```
+
+\^ Above you'll find the optimal configuration of the model.
+
+```{r}
+# Fit the finalized model on the entire training data
+final_glm_fit <- fit(final_glm_workflow, data = train_data)
+
+```
+
+Predict on test data
+
+```{r}
+# Make predictions on the test set
+glm_predictions <- augment(final_glm_fit, new_data = test_data)
+
+# Evaluate the model's performance (RMSE)
+glm_metrics <- glm_predictions %>%
+  metrics(truth = log_fantasy_points, estimate = .pred)
+
+# Print the evaluation metrics
+print(glm_metrics)
+
+glm_predictions %>%
+  mutate(resid = log_fantasy_points - .pred) %>%
+  ggplot(aes(x = resid)) +
+    geom_histogram()
+
+# Plot raw estimates
+glm_predictions %>%
+  mutate(fp_pred = exp(.pred) - 1, fp_resid = .pred - fantasy_points) %>%
+  #filter(fantasy_points >= 0) %>%
+  metrics(truth = fantasy_points,estimate = fp_pred)
+
+glm_predictions %>%
+  ggplot(aes(x = log_fantasy_points)) +
+    geom_histogram()
+```
