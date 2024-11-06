@@ -41,8 +41,6 @@ We've loaded our schedules in with some interesting variables to use in our mode
 
 ```{r}
 nfl_game_results %>%
-  # Remove the upcoming season
-  filter(season < 2024) %>%
   pivot_longer(cols = c(away_team,home_team),
                names_to = "home_away",
                values_to = "team") %>%

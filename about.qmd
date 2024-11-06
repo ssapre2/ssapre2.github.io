@@ -6,17 +6,17 @@ about:
   links:
     - icon: twitter
       text: Twitter
-      href: https://twitter.com
+      href: https://twitter.com/sameersapre_9
     - icon: linkedin
       text: LinkedIn
       href: https://www.linkedin.com/in/sameer-sapre-081507134
     - icon: github
       text: Github
-      href: https://github.com
+      href: https://github.com/ssapre2
 
 ---
 
 Hello everyone! My name is Sameer Sapre and I am an analyst working in the Baseball Projects group with the Seattle Mariners.
 
-I am also currently a graduate student at the University of Washington studying Industrial Engineering. 
+I am also currently a part-time graduate student at the University of Washington studying Industrial Engineering. Most of my work asdf
 
