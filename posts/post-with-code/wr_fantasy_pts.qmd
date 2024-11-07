@@ -23,16 +23,7 @@ library(nflfastR)
 stats24 = load_player_stats(2024)
 stats = load_player_stats(seasons = seq(2006,2023))
 pbp23 = load_pbp(2023)
-# Load next gen
-ng = load_nextgen_stats(stat_type = 'receiving') %>% 
-  # Filter on WRs ... only use weekly avg
-  filter(player_position == 'WR', week > 0) %>%
-  # Select non-overlapping stats from 'stats'
-  # YAC variables have NA for 0 receptions or no yac (ex. endzone TDs)
-  mutate(across(contains('_yac'),~ ifelse(is.na(.),0,.))) %>%
-  select(-c(player_display_name,player_position))
 
-load_nextgen_stats(seasons = T,stat_type = "receiving") -> all_ng
 
 dc = load_depth_charts(season = seq(2016,most_recent_season())) %>% filter(position == 'WR',formation == 'Offense') %>%
   select(season,recent_team = club_code,week,season_type = game_type,player_id = gsis_id,depth_team)
@@ -50,7 +41,6 @@ wr_data <- stats %>%
   # Add depth chart status since we don't have participation data
   left_join(y = dc,by = c('player_id','week','season','season_type',"recent_team")) %>%
   # Only first 3 are counted so some players are NA'd if they're below 3rd on DC
-  left_join(y = ng, by = c('player_id'='player_gsis_id','week','season','season_type','recent_team' = 'team_abbr','receptions','targets')) %>%
   replace_na(list(depth_team = '4')) %>%
   mutate(depth_team = as.numeric(depth_team))
 
@@ -72,7 +62,7 @@ ff_2024 %>% filter(position == 'WR') %>% select(game_id,player_id,season,rec_fan
 
 ## Missingness
 
-Vizualize missingness in data. Check problematic columns and check removal scenarios.
+It looks like there are some patterns of missingness in the dataset we've created. Ideally, we'd could probably impute these values, but for the brevity, we'll filter out the NA's of racr, due to the intersection with other metrics. 
 
 ```{r}
 library(naniar)
@@ -81,14 +71,15 @@ gg_miss_case(wr_data)
 
 gg_miss_var(wr_data)
 
-# What if we take out racr?
 
 wr_data %>%
-  filter(!is.na(racr),!is.na(avg_yac_above_expectation)) %>%
-  gg_miss_var()
+  select(racr,air_yards_share,wopr,target_share,receiving_epa) -> df_miss
 
-
+df_miss %>%
+  gg_miss_upset()
+# What if we take out racr?
 ```
+
 
 ## Time Weighting
 
@@ -116,35 +107,72 @@ weighted_avg = function(metric_vector){
 
 ```
 
-Use Thomas Mock (slider package)
+Now that we have our simple time-weighting built, let's make use of Davis Vaughn's [slider] (https://slider.r-lib.org/articles/slider.html) package. It's a tidy way to calculate sliding window summaries. We'll do that to create a set of potential numeric predictors.
 
 ```{r}
 library(TTR)
 library(slider)
 
 wr_data %>%
+  # Should remove most missingness
   filter(!is.na(racr)) %>%
-  # Cannot use week  
   group_by(player_id,season) %>%
   arrange(week) %>%
-  # Weighted Avg
+  # Weighted Avg (moving)
+  # Take lag so we are not leaking any data
   mutate(across(receptions:depth_team, ~ lag(slide_dbl(.x,.f = weighted_avg,.before = Inf,.complete = TRUE)),.names = "wt_{col}")) %>%
-  # Exp-ish mean
-  mutate(across(receptions:rec_fp, ~ lag(slide_dbl(.x,.f = exp_wt,.before = Inf,.complete = TRUE)),.names = "exp_{col}")) %>%
-  # Lag
-  mutate(across(receptions:rec_fp, ~lag(.x),.names = 'lag_{col}')) %>%
-  #mutate(depth_team = as.numeric(depth_team)) %>%
   ungroup() %>%
-  mutate(fantasy_points = ifelse(fantasy_points < 0,0,fantasy_points),
-         log_fantasy_points = log(fantasy_points + 1)) %>%
+  # Convert negative fantasy points to 0
+  mutate(fantasy_points_target = ifelse(fantasy_points < 0,0,fantasy_points),
+         log_fantasy_points = log(fantasy_points_target + 1)) %>%
   # Need data, don't use week 1 for now
-  filter(week > 1) -> ema_wr
+  filter(week > 1) -> ma_wr
 
 ```
 
-# Preprocess
 
-Created a dataset for weighted mean
+
+## Correlations
+
+Before we start splitting data for the model, let's take a look at variable correlations. This may influence our model choices.
+
+```{r}
+# Calculate the correlation matrix
+cor_matrix <- ma_wr %>% 
+  select(starts_with("wt_"), fantasy_points_target) %>%
+  cor(use = "complete.obs")
+
+# Reshape the correlation matrix for ggplot
+cor_data <- reshape2::melt(cor_matrix)
+
+ggplot(data = cor_data, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", midpoint = 0, limit = c(-1,1), name="Correlation") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1)) +
+  labs(title = "Correlation Matrix of Dataset", x = "", y = "")
+
+
+```
+
+Okay, it looks like there is a high degree of colinearity between our weighted measures. Not very surprising. We'll use a few modeling techniques below that should address the issues of highly correlated variables.
+
+
+In addition, if we look at our target variable, we notice something interesting... it's got a funky distribution. Should we be using linear regression?  
+
+```{r}
+ma_wr %>%
+  ggplot(aes(x = fantasy_points_target)) +
+    geom_histogram()
+
+ma_wr %>%
+  ggplot(aes(x = log_fantasy_points)) +
+  geom_histogram()
+```
+
+
+
+## Preprocess
 
 ```{r}
 library(tidymodels)
@@ -153,11 +181,11 @@ library(tidymodels)
 
 set.seed(222)
 # Put 3/4 of the data into the training set 
-data_split <- ema_wr %>% 
+data_split <- ma_wr %>% 
   # Don't use first week
   filter(week >1)%>%
   # Filter on relevant columns
-  select(starts_with('wt_'),log_fantasy_points,player_id,season,week,recent_team,
+  select(starts_with('wt_'),fantasy_points_target,player_id,season,week,recent_team,
          fantasy_points,fantasy_points_ppr) %>% 
   # make split
   initial_split( prop = 3/4)
@@ -169,13 +197,12 @@ test_data  <- testing(data_split)
 
 ```{r}
 wt_recipe = train_data %>%
-  recipe(log_fantasy_points ~ .,) %>%
+  recipe(fantasy_points_target ~ .,) %>%
   update_role(c(player_id,recent_team,fantasy_points,fantasy_points_ppr),new_role = 'ID') %>%
   # Generally not recommended to throw out all data, but for brevity, let's remove NAs
-  step_naomit(all_numeric_predictors()) 
+  step_naomit(all_numeric_predictors()) %>%
   # Remove zero variance predictors (ie. variables that contribute nothing to prediction)
- # step_zv(all_predictors()) %>%
- # step_center(all_numeric_predictors())
+ step_center(all_numeric_predictors())
 #
 
 summary(wt_recipe)
@@ -188,12 +215,12 @@ test_data %>%
 sum(colSums(is.na(test_data)))
 ```
 
-## Exponential model -------------------------------
+## Model Building -------------------------------
 
 ```{r}
 
 exp_recipe = train_data  %>%
-  recipe(log_fantasy_points ~ .,) %>%
+  recipe(fantasy_points_target ~ .,) %>%
   update_role(c(player_id,recent_team,fantasy_points,fantasy_points_ppr),new_role = 'ID') %>%
   # Generally not recommended to throw out all data, but for brevity, let's remove NAs
   step_naomit(all_numeric_predictors()) %>%
@@ -274,6 +301,11 @@ Examine Tuning Results
 
 ```{r}
 # Show the tuning results
+tuned_results %>%
+  collect_metrics() %>%
+  filter(.metric == "rmse") %>%
+  arrange(mean)
+
 glm_tune_results %>%
   collect_metrics() %>%
   filter(.metric == "rmse") %>%
@@ -308,7 +340,7 @@ glm_predictions <- augment(final_glm_fit, new_data = test_data)
 
 # Evaluate the model's performance (RMSE)
 glm_metrics <- glm_predictions %>%
-  metrics(truth = log_fantasy_points, estimate = .pred)
+  metrics(truth = fantasy_points_target, estimate = .pred)
 
 # Print the evaluation metrics
 print(glm_metrics)
