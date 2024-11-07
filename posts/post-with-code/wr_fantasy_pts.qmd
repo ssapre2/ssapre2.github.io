@@ -360,3 +360,44 @@ glm_predictions %>%
   ggplot(aes(x = log_fantasy_points)) +
     geom_histogram()
 ```
+
+
+
+
+## XGBoost ----------
+
+```{r}
+xgb_spec <- boost_tree(
+    trees = 200,
+    tree_depth = 8,
+    learn_rate = 0.1
+) %>%
+    set_engine("xgboost",colsample_bytree = 0.8,
+               counts = F) %>%
+    set_mode("regression")
+
+
+#library(doParallel)
+
+# Register cores for parallel processing
+#registerDoParallel(cores = parallel::detectCores() - 1)
+
+# Then fit your workflow as usual
+xgb_wflow <- workflow() %>%
+    add_model(xgb_spec) %>%
+    add_recipe(exp_recipe)
+
+```
+
+```{r}
+xgb_results <- fit_resamples(
+    xgb_wflow,
+    resamples = wr_folds,
+    metrics = metric_set(rmse, rsq, mae)  # Adjust for your problem type
+)
+```
+
+```{r}
+collect_metrics(xgb_results)
+```
+
