@@ -185,7 +185,7 @@ data_split <- ma_wr %>%
   # Don't use first week
   filter(week >1)%>%
   # Filter on relevant columns
-  select(starts_with('wt_'),fantasy_points_target,player_id,season,week,recent_team,
+  select(starts_with('wt_'),log_fantasy_points,player_id,season,week,recent_team,
          fantasy_points,fantasy_points_ppr) %>% 
   # make split
   initial_split( prop = 3/4)
@@ -202,7 +202,8 @@ wt_recipe = train_data %>%
   # Generally not recommended to throw out all data, but for brevity, let's remove NAs
   step_naomit(all_numeric_predictors()) %>%
   # Remove zero variance predictors (ie. variables that contribute nothing to prediction)
- step_center(all_numeric_predictors())
+ step_center(all_numeric_predictors()) %>%
+  step_BoxCox()
 #
 
 summary(wt_recipe)
@@ -220,7 +221,7 @@ sum(colSums(is.na(test_data)))
 ```{r}
 
 exp_recipe = train_data  %>%
-  recipe(fantasy_points_target ~ .,) %>%
+  recipe(log_fantasy_points ~ .,) %>%
   update_role(c(player_id,recent_team,fantasy_points,fantasy_points_ppr),new_role = 'ID') %>%
   # Generally not recommended to throw out all data, but for brevity, let's remove NAs
   step_naomit(all_numeric_predictors()) %>%
@@ -346,17 +347,9 @@ glm_metrics <- glm_predictions %>%
 print(glm_metrics)
 
 glm_predictions %>%
-  mutate(resid = log_fantasy_points - .pred) %>%
+  mutate(resid = fantasy_points_target - .pred) %>%
   ggplot(aes(x = resid)) +
     geom_histogram()
 
-# Plot raw estimates
-glm_predictions %>%
-  mutate(fp_pred = exp(.pred) - 1, fp_resid = .pred - fantasy_points) %>%
-  #filter(fantasy_points >= 0) %>%
-  metrics(truth = fantasy_points,estimate = fp_pred)
 
-glm_predictions %>%
-  ggplot(aes(x = log_fantasy_points)) +
-    geom_histogram()
 ```
