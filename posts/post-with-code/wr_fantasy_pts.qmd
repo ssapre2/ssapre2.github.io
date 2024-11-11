@@ -185,7 +185,7 @@ data_split <- ma_wr %>%
   # Don't use first week
   filter(week >1)%>%
   # Filter on relevant columns
-  select(starts_with('wt_'),log_fantasy_points,player_id,season,week,recent_team,
+  select(starts_with('wt_'),fantasy_points_target,player_id,season,week,recent_team,
          fantasy_points,fantasy_points_ppr) %>% 
   # make split
   initial_split( prop = 3/4)
@@ -202,8 +202,7 @@ wt_recipe = train_data %>%
   # Generally not recommended to throw out all data, but for brevity, let's remove NAs
   step_naomit(all_numeric_predictors()) %>%
   # Remove zero variance predictors (ie. variables that contribute nothing to prediction)
- step_center(all_numeric_predictors()) %>%
-  step_BoxCox()
+ step_center(all_numeric_predictors())
 #
 
 summary(wt_recipe)
@@ -221,7 +220,7 @@ sum(colSums(is.na(test_data)))
 ```{r}
 
 exp_recipe = train_data  %>%
-  recipe(log_fantasy_points ~ .,) %>%
+  recipe(fantasy_points_target ~ .,) %>%
   update_role(c(player_id,recent_team,fantasy_points,fantasy_points_ppr),new_role = 'ID') %>%
   # Generally not recommended to throw out all data, but for brevity, let's remove NAs
   step_naomit(all_numeric_predictors()) %>%
@@ -301,11 +300,7 @@ Tune Model w/ Cross Validation
 Examine Tuning Results
 
 ```{r}
-# Show the tuning results
-tuned_results %>%
-  collect_metrics() %>%
-  filter(.metric == "rmse") %>%
-  arrange(mean)
+# Display tuning results
 
 glm_tune_results %>%
   collect_metrics() %>%
@@ -353,3 +348,17 @@ glm_predictions %>%
 
 
 ```
+
+
+## Model assumptions
+
+Let's make sure this model is meeting the assumptions of linear regressions.
+
+```{r}
+par(mfrow = c(2, 2))
+final_glm_fit$fit$fit$fit
+plot(final_glm_fit)
+```
+
+
+
