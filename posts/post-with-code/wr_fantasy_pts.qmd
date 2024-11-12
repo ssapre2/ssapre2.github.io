@@ -241,6 +241,8 @@ Create specifications for elastic net model using glmnet and tune
 
 ## GLM --------------------------
 
+We'll train a general linear model (GLM). This is a type of linear regression which provides a type of built-in variable selection. The nuts and bolts of this modeling strategy are beyond the scope of this post, but for those interested in learning, there's tons of material on a concept called *regularization* upon which this strategy is built.
+
 ```{r}
 # Specify a penalized GLM model with tuning parameters
 glm_model <- linear_reg(penalty = tune(), mixture = tune()) %>%
@@ -308,7 +310,7 @@ glm_tune_results %>%
   arrange(mean)
 ```
 
-Find the best parameters of the group
+Find the best parameters of the group.
 
 ```{r}
 # Select the best hyperparameters based on RMSE
@@ -320,7 +322,9 @@ final_glm_workflow <- finalize_workflow(glm_wflow, best_glm)
 best_glm
 ```
 
-\^ Above you'll find the optimal configuration of the model.
+\^ Above you'll find the optimal configuration of the model. We won't get too far into the weeds here, but will not that the penalty term is small (low regularization, high complexity) and the mixture (type of regularization) indicates more of a Ridge regression (more shrinkage, less variable elimination). 
+
+Below, we'll take the best as
 
 ```{r}
 # Fit the finalized model on the entire training data
