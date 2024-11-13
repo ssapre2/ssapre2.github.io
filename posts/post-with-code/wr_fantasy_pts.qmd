@@ -186,7 +186,7 @@ data_split <- ma_wr %>%
   filter(week >1)%>%
   # Filter on relevant columns
   select(starts_with('wt_'),fantasy_points_target,player_id,season,week,recent_team,
-         fantasy_points,fantasy_points_ppr) %>% 
+         fantasy_points,fantasy_points_ppr,log_fantasy_points) %>% 
   # make split
   initial_split( prop = 3/4)
 
@@ -310,7 +310,7 @@ glm_tune_results %>%
   arrange(mean)
 ```
 
-Find the best parameters of the group.
+Find the best parameters of the group. `finalize_workflow()` will choose the model with the optimal set of hyperparameters as found in `select_best()`.
 
 ```{r}
 # Select the best hyperparameters based on RMSE
@@ -324,7 +324,7 @@ best_glm
 
 \^ Above you'll find the optimal configuration of the model. We won't get too far into the weeds here, but will not that the penalty term is small (low regularization, high complexity) and the mixture (type of regularization) indicates more of a Ridge regression (more shrinkage, less variable elimination). 
 
-Below, we'll take the best as
+Below, we'll take the best model and fit it to the entire training data set before validating it against the test set.
 
 ```{r}
 # Fit the finalized model on the entire training data
@@ -332,11 +332,20 @@ final_glm_fit <- fit(final_glm_workflow, data = train_data)
 
 ```
 
-Predict on test data
+
+## Model Evaluation/Diagnostics
+
+### Variable Importance
+
+
+
+
+Now that we have our model fit on the full training set, let's evaluate it, check it's reliability and it's compliance with key assumptions.
 
 ```{r}
-# Make predictions on the test set
-glm_predictions <- augment(final_glm_fit, new_data = test_data)
+# Make predictions on the test set and tidy
+glm_predictions <- augment(final_glm_fit, new_data = test_data) %>%
+  mutate(.resid = fantasy_points_target - .pred)
 
 # Evaluate the model's performance (RMSE)
 glm_metrics <- glm_predictions %>%
@@ -345,24 +354,40 @@ glm_metrics <- glm_predictions %>%
 # Print the evaluation metrics
 print(glm_metrics)
 
-glm_predictions %>%
-  mutate(resid = fantasy_points_target - .pred) %>%
-  ggplot(aes(x = resid)) +
+# Distribution of predictors
+glm_predictions  %>%
+  ggplot(aes(x = .resid)) +
     geom_histogram()
 
-
+# Residuals vs fitted
+ggplot(glm_predictions,aes(x = .pred, y=.resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0,linetype = "dashed",color = "red")+
+  labs(title = "Residuals vs. Fitted", y= "Residuals",x = "Fitted")
 ```
 
-
-## Model assumptions
-
-Let's make sure this model is meeting the assumptions of linear regressions.
+QQ - Plot
 
 ```{r}
-par(mfrow = c(2, 2))
-final_glm_fit$fit$fit$fit
-plot(final_glm_fit)
+ggplot(glm_predictions,aes(sample = .resid)) +
+  geom_qq() +
+  geom_qq_line() +
+  labs(title = "Q-Q Plot of Residuals") +
+  theme_minimal() 
 ```
 
+This plot is a bit indicting as we can see the points at the end of the QQPlot start to tail off, suggesting that there are some outliers in fantasy points scored or a linear model may not be the best approach for this dataset and we probably should not trust this model for valid inference and prediction. We should use this as a reason to explore non-linear modeling techniques or modify this model to include interactions or transform the target variable.  
 
 
+```{r}
+final_glm_fit %>% 
+  vip::vi() %>%
+  mutate(Importance = abs(Importance),
+         Variable = fct_reorder(Variable,Importance)) %>%
+  ggplot(aes(x = Importance, y = Variable, fill = Sign)) +
+  geom_col() +
+  scale_x_continuous(expand = c(0,0))
+  
+```
+
+As mentioned earlier, we will probably need to better account for interaction terms either thr
