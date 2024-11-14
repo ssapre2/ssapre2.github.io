@@ -16,7 +16,10 @@ about:
 
 ---
 
-Hello everyone! My name is Sameer Sapre and I am an analyst working in the Baseball Projects group with the Seattle Mariners.
+Hello everyone! 
+My name is Sameer Sapre and I am a data analyst with the Seattle Mariners and a graduate student at the University of Washington studying Industrial Engineering.
+I graduated from Penn State University in 2020 with a B.S. in Data Sciences and have previously worked for Mars, Inc.
+Outside of work, I'm the President of my [local Toastmasters chapter (please join!)](https://www.toastmasters.org/Find-a-Club/01417617-01417617) and a youth soccer coach with Seattle Parks and Rec. 
 
-I am also currently a graduate student at the University of Washington studying Industrial Engineering. 
+
 
