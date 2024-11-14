@@ -6,13 +6,13 @@ about:
   links:
     - icon: twitter
       text: Twitter
-      href: https://twitter.com
+      href: https://twitter.com/sameersapre_9
     - icon: linkedin
       text: LinkedIn
       href: https://www.linkedin.com/in/sameer-sapre-081507134
     - icon: github
       text: Github
-      href: https://github.com
+      href: https://github.com/ssapre2
 
 ---
 
