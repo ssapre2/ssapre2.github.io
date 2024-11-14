@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 <meta name="author" content="Sameer Sapre">
-<meta name="dcterms.date" content="2024-05-16">
+<meta name="dcterms.date" content="2024-09-16">
 
 <title>Blog - Predicting Wide Receiver Fantasy Points w/ Tidymodels</title>
 <style>
@@ -171,7 +171,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
       <div>
       <div class="quarto-title-meta-heading">Published</div>
       <div class="quarto-title-meta-contents">
-        <p class="date">May 16, 2024</p>
+        <p class="date">September 16, 2024</p>
       </div>
     </div>
     
@@ -192,8 +192,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="introduction" class="level2">
 <h2 class="anchored" data-anchor-id="introduction">Introduction</h2>
-<p>I’ve played fantasy football for a decade and have always wondered how ESPN (and Yahoo, Sleeper, etc.) make their fantasy projections week to week. Where are they getting their numbers? Where are they getting probabilities from? What makes them think that Ja’Marr Chase is going to score 16.3 points for me this week vs.&nbsp;D? Why does his projection go up that much (or that little) if Tee Higgins happens to be out injured? Perhaps we won’t get a chance to peak inside of ESPN’s crystal ball, but maybe we can try to build our own?</p>
-<p>In this post, I’ll attempt to build a predictive model that can output our projections for fantasy football players based on their past performance. We’ll narrow the scope to wide receivers now, but this process can largely be applied to players of other positions.</p>
+<p>I’ve played fantasy football for a decade and have always wondered how ESPN (and Yahoo, Sleeper, etc.) make their fantasy projections week to week. Where are they getting their estimates from? Why is Ja’Marr Chase projected to score 16.3 points for me this week? Why does his projection go up that much (or that little) if Tee Higgins happens to be out injured? Perhaps we won’t get a chance to peak inside of ESPN’s crystal ball, but maybe we can try to build our own!</p>
+<p>In this post, I’ll attempt to build a predictive model that can output our projections for fantasy football players based on their past performance. We’ll narrow the scope to wide receivers now, but this process can largely be applied to players of any position.</p>
 <p>We’ll go step by step through data cleaning, feature engineering, model selection and training, and model validation before finishing up with conclusions and takeaways.</p>
 </section>
 <section id="r-markdown" class="level2">
@@ -256,11 +256,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 </div>
 <div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># What if we take out racr?</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>Ideally, we’d could probably impute these values, but for the brevity, we’ll filter out the NA’s of racr, due to the intersection with other metrics. Player Name is not important for our purposes.</p>
+<p>Ideally, we would like to impute these values, but for brevity, we’ll filter out the NA’s of ‘racr’.</p>
 </section>
 <section id="time-weighting" class="level2">
 <h2 class="anchored" data-anchor-id="time-weighting">Time Weighting</h2>
-<p>We want our predictions for each player to be based on their past performance. However, we’d like the most recent performances to be weighed the heaviest. To do that, we can introduce a simple time-weighting scheme. In the function below, we take a data vector (ex. receptions) and return a weighted average based on the length of the vector.</p>
+<p>We want our predictions for each player to be based on their past performance. However, we’d like the most recent performances to be weighed heaviest. To do that, we can introduce a simple time-weighting scheme. In the function below, we take a data vector (ex. receptions) and return a weighted average based on the length of the vector.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Create Time Weighting </span></span>
 <span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a></span>
@@ -279,7 +279,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb7-15"><a href="#cb7-15" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb7-16"><a href="#cb7-16" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>Now that we have our simple time-weighting built, let’s make use of Davis Vaughn’s [slider] (https://slider.r-lib.org/articles/slider.html) package. It’s a tidy way to calculate sliding window summaries. We’ll do that to create a set of potential numeric predictors.</p>
+<p>Now that we have our simple time-weighting built, let’s make use of Davis Vaughn’s <a href="https://slider.r-lib.org/articles/slider.html">slider</a> package. It’s a tidy way to calculate sliding window summaries. We’ll do that to create a set of potential numeric predictors.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(TTR)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
@@ -299,12 +299,13 @@ Attaching package: 'TTR'</code></pre>
 <span id="cb11-6"><a href="#cb11-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(player_id,season) <span class="sc">%&gt;%</span></span>
 <span id="cb11-7"><a href="#cb11-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(week) <span class="sc">%&gt;%</span></span>
 <span id="cb11-8"><a href="#cb11-8" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Weighted Avg (moving)</span></span>
-<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Take lag so we are not leaking any data</span></span>
+<span id="cb11-9"><a href="#cb11-9" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Take lag so we are not leaking data</span></span>
 <span id="cb11-10"><a href="#cb11-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="fu">across</span>(receptions<span class="sc">:</span>depth_team, <span class="sc">~</span> <span class="fu">lag</span>(<span class="fu">slide_dbl</span>(.x,<span class="at">.f =</span> weighted_avg,<span class="at">.before =</span> <span class="cn">Inf</span>,<span class="at">.complete =</span> <span class="cn">TRUE</span>)),<span class="at">.names =</span> <span class="st">"wt_{col}"</span>)) <span class="sc">%&gt;%</span></span>
 <span id="cb11-11"><a href="#cb11-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span></span>
 <span id="cb11-12"><a href="#cb11-12" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Convert negative fantasy points to 0</span></span>
 <span id="cb11-13"><a href="#cb11-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fantasy_points_target =</span> <span class="fu">ifelse</span>(fantasy_points <span class="sc">&lt;</span> <span class="dv">0</span>,<span class="dv">0</span>,fantasy_points),</span>
-<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>         <span class="at">log_fantasy_points =</span> <span class="fu">log</span>(fantasy_points_target <span class="sc">+</span> <span class="dv">1</span>)) <span class="ot">-&gt;</span> ma_wr</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb11-14"><a href="#cb11-14" aria-hidden="true" tabindex="-1"></a>         <span class="co"># Take log (more on this later)</span></span>
+<span id="cb11-15"><a href="#cb11-15" aria-hidden="true" tabindex="-1"></a>         <span class="at">log_fantasy_points =</span> <span class="fu">log</span>(fantasy_points_target <span class="sc">+</span> <span class="dv">1</span>)) <span class="ot">-&gt;</span> ma_wr</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Let’s use the example of Brandon Aiyuk as a sanity check.</p>
 <div class="cell">
@@ -337,7 +338,7 @@ Attaching package: 'TTR'</code></pre>
 # ℹ 1 more variable: wt_receiving_yards &lt;dbl&gt;</code></pre>
 </div>
 </div>
-<p>A quick scan indicates that our time weighted average is calculated as intended.</p>
+<p>A quick scan shows that our time weighted averages are calculated as intended.</p>
 </section>
 <section id="correlations" class="level2">
 <h2 class="anchored" data-anchor-id="correlations">Correlations</h2>
@@ -365,7 +366,7 @@ Attaching package: 'TTR'</code></pre>
 </div>
 </div>
 </div>
-<p>Okay, it looks like there is a high degree of colinearity between our weighted measures. Not very surprising. We’ll use a few modeling techniques below that should address the issues of highly correlated variables.</p>
+<p>Okay, the heatmap here shows a lot of red. It looks like there is a high degree of multicollinearity between our weighted measures. We’ll touch on this issue, but won’t fully address it in this post. Just be aware that it can make inference and interpretation of a linear model quite difficult.</p>
 <p>In addition, if we look at our target variable, we notice something interesting… it’s got a skewed distribution. Should we be using linear regression?</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>ma_wr <span class="sc">%&gt;%</span></span>
@@ -398,7 +399,7 @@ Attaching package: 'TTR'</code></pre>
 </div>
 </div>
 </div>
-<p>Hmmm, our histogram still looks a bit funky. The distribution seems to have shifted closer to a bell curve we’d want for linear regression, but there are A LOT of 0s (more on that later).</p>
+<p>Hmmm, our histogram still looks a bit funky. The distribution seems to have shifted closer to a bell curve we’d want for linear regression, but there are A LOT of 0s (more on that later). For now, we’ll run with this transformation and see where it takes us.</p>
 </section>
 <section id="preprocess" class="level2">
 <h2 class="anchored" data-anchor-id="preprocess">Preprocess</h2>
@@ -422,73 +423,40 @@ Attaching package: 'TTR'</code></pre>
 <span id="cb19-16"><a href="#cb19-16" aria-hidden="true" tabindex="-1"></a>test_data  <span class="ot">&lt;-</span> <span class="fu">testing</span>(data_split)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>wt_recipe <span class="ot">=</span> train_data <span class="sc">%&gt;%</span></span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">recipe</span>(fantasy_points_target <span class="sc">~</span> .,) <span class="sc">%&gt;%</span></span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">update_role</span>(<span class="fu">c</span>(player_id,recent_team,fantasy_points,fantasy_points_ppr),<span class="at">new_role =</span> <span class="st">'ID'</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Generally not recommended to throw out all data, but for brevity, let's remove NAs</span></span>
-<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">#step_naomit(all_numeric_predictors()) %&gt;%</span></span>
-<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_impute_median</span>(<span class="fu">all_numeric_predictors</span>()) <span class="sc">%&gt;%</span></span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Remove zero variance predictors (ie. variables that contribute nothing to prediction)</span></span>
-<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a> <span class="fu">step_center</span>(<span class="fu">all_numeric_predictors</span>())</span>
-<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a><span class="co">#</span></span>
-<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(wt_recipe)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 27 × 4
-   variable                       type      role      source  
-   &lt;chr&gt;                          &lt;list&gt;    &lt;chr&gt;     &lt;chr&gt;   
- 1 wt_receptions                  &lt;chr [2]&gt; predictor original
- 2 wt_targets                     &lt;chr [2]&gt; predictor original
- 3 wt_receiving_yards             &lt;chr [2]&gt; predictor original
- 4 wt_receiving_tds               &lt;chr [2]&gt; predictor original
- 5 wt_receiving_fumbles           &lt;chr [2]&gt; predictor original
- 6 wt_receiving_fumbles_lost      &lt;chr [2]&gt; predictor original
- 7 wt_receiving_air_yards         &lt;chr [2]&gt; predictor original
- 8 wt_receiving_yards_after_catch &lt;chr [2]&gt; predictor original
- 9 wt_receiving_first_downs       &lt;chr [2]&gt; predictor original
-10 wt_receiving_epa               &lt;chr [2]&gt; predictor original
-# ℹ 17 more rows</code></pre>
-</div>
-</div>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>test_data <span class="sc">%&gt;%</span></span>
-<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(wt_receptions)) <span class="ot">-&gt;</span> test_data</span>
-<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">colSums</span>(<span class="fu">is.na</span>(test_data)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>test_data <span class="sc">%&gt;%</span></span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(<span class="sc">!</span><span class="fu">is.na</span>(wt_receptions)) <span class="ot">-&gt;</span> test_data</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(<span class="fu">colSums</span>(<span class="fu">is.na</span>(test_data)))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>[1] 0</code></pre>
 </div>
 </div>
 </section>
-<section id="model-building--" class="level2">
-<h2 class="anchored" data-anchor-id="model-building--">Model Building ——————————-</h2>
+<section id="model-building" class="level2">
+<h2 class="anchored" data-anchor-id="model-building">Model Building</h2>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>exp_recipe <span class="ot">=</span> train_data  <span class="sc">%&gt;%</span></span>
-<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">recipe</span>(log_fantasy_points <span class="sc">~</span> .,) <span class="sc">%&gt;%</span></span>
-<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">update_role</span>(<span class="fu">c</span>(player_id,recent_team,fantasy_points,fantasy_points_ppr,fantasy_points_target),<span class="at">new_role =</span> <span class="st">'ID'</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Generally not recommended to throw out all data, but for brevity, let's remove NAs</span></span>
-<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">#step_naomit(all_numeric_predictors()) %&gt;%</span></span>
-<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_impute_median</span>(<span class="fu">all_numeric_predictors</span>()) <span class="sc">%&gt;%</span></span>
-<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a> <span class="co"># Remove zero variance predictors (ie. variables that contribute nothing to prediction)</span></span>
-<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_zv</span>(<span class="fu">all_predictors</span>()) <span class="sc">%&gt;%</span></span>
-<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_center</span>(<span class="fu">all_numeric_predictors</span>())</span>
-<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a><span class="co">#summary(exp_recipe)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>exp_recipe <span class="ot">=</span> train_data  <span class="sc">%&gt;%</span></span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">recipe</span>(log_fantasy_points <span class="sc">~</span> .,) <span class="sc">%&gt;%</span></span>
+<span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">update_role</span>(<span class="fu">c</span>(player_id,recent_team,fantasy_points,fantasy_points_ppr,fantasy_points_target),<span class="at">new_role =</span> <span class="st">'ID'</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb22-4"><a href="#cb22-4" aria-hidden="true" tabindex="-1"></a>  <span class="co"># Generally not recommended to throw out all data, but for brevity, let's remove NAs</span></span>
+<span id="cb22-5"><a href="#cb22-5" aria-hidden="true" tabindex="-1"></a>  <span class="co">#step_naomit(all_numeric_predictors()) %&gt;%</span></span>
+<span id="cb22-6"><a href="#cb22-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_impute_median</span>(<span class="fu">all_numeric_predictors</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb22-7"><a href="#cb22-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-8"><a href="#cb22-8" aria-hidden="true" tabindex="-1"></a> <span class="co"># Remove zero variance predictors (ie. variables that contribute nothing to prediction)</span></span>
+<span id="cb22-9"><a href="#cb22-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_zv</span>(<span class="fu">all_predictors</span>()) <span class="sc">%&gt;%</span></span>
+<span id="cb22-10"><a href="#cb22-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">step_center</span>(<span class="fu">all_numeric_predictors</span>())</span>
+<span id="cb22-11"><a href="#cb22-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-12"><a href="#cb22-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb22-13"><a href="#cb22-13" aria-hidden="true" tabindex="-1"></a><span class="co">#summary(exp_recipe)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
-<section id="cross-validation-tuning--" class="level1">
-<h1>Cross-Validation + Tuning ————-</h1>
-<section id="create-model" class="level2">
-<h2 class="anchored" data-anchor-id="create-model">Create Model</h2>
-<p>Create specifications for elastic net model using glmnet and tune</p>
-</section>
-<section id="glm" class="level2">
-<h2 class="anchored" data-anchor-id="glm">GLM ————————–</h2>
-<p>We’ll train a general linear model (GLM). This is a type of linear regression which provides a type of built-in variable selection. The nuts and bolts of this modeling strategy are beyond the scope of this post, but for those interested in learning, there’s tons of material on a concept called <em>regularization</em> upon which this strategy is built.</p>
+<section id="cross-validation-tuning--" class="level2">
+<h2 class="anchored" data-anchor-id="cross-validation-tuning--">Cross-Validation + Tuning ————-</h2>
+<section id="glm" class="level3">
+<h3 class="anchored" data-anchor-id="glm">GLM ————————–</h3>
+<p>We’ll train a general linear model (GLM). This is a type of linear regression which provides a type of built-in variable selection. The nuts and bolts of this modeling strategy are beyond the scope of this post, but for those interested in learning, there are tons of material on a concept called <em>regularization</em> upon which this strategy is built.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(glmnet)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="fu">library</span>(glmnet)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>Loading required package: Matrix</code></pre>
 </div>
@@ -504,78 +472,75 @@ Attaching package: 'Matrix'</code></pre>
 <div class="cell-output cell-output-stderr">
 <pre><code>Loaded glmnet 4.1-8</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a><span class="co">#library(lightgbm)</span></span>
-<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a><span class="co">#library(bonsai)</span></span>
-<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>glm_spec <span class="ot">&lt;-</span> <span class="fu">linear_reg</span>(</span>
-<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>  <span class="at">penalty =</span> <span class="fu">tune</span>(),     <span class="co"># Lambda (regularization strength)</span></span>
-<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>  <span class="at">mixture =</span> <span class="fu">tune</span>(),    <span class="co"># Alpha (0 = Ridge, 1 = Lasso, values in between = Elastic Net)</span></span>
-<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>    </span>
-<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
-<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_engine</span>(<span class="st">"glmnet"</span>)</span>
-<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>glm_wflow <span class="ot">&lt;-</span></span>
-<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">workflow</span>() <span class="sc">%&gt;%</span> </span>
-<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_recipe</span>(exp_recipe) <span class="sc">%&gt;%</span></span>
-<span id="cb30-14"><a href="#cb30-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_model</span>(glm_spec)</span>
-<span id="cb30-15"><a href="#cb30-15" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb30-16"><a href="#cb30-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb30-17"><a href="#cb30-17" aria-hidden="true" tabindex="-1"></a>wr_folds <span class="ot">&lt;-</span> <span class="fu">vfold_cv</span>(train_data, <span class="at">v =</span> <span class="dv">5</span>)</span>
-<span id="cb30-18"><a href="#cb30-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb30-19"><a href="#cb30-19" aria-hidden="true" tabindex="-1"></a><span class="co"># Tune the hyperparameters using a grid of values</span></span>
-<span id="cb30-20"><a href="#cb30-20" aria-hidden="true" tabindex="-1"></a>glm_tune_results <span class="ot">&lt;-</span> <span class="fu">tune_grid</span>(</span>
-<span id="cb30-21"><a href="#cb30-21" aria-hidden="true" tabindex="-1"></a>  glm_wflow,</span>
-<span id="cb30-22"><a href="#cb30-22" aria-hidden="true" tabindex="-1"></a>  <span class="at">resamples =</span> wr_folds,</span>
-<span id="cb30-23"><a href="#cb30-23" aria-hidden="true" tabindex="-1"></a>  <span class="at">grid =</span> <span class="dv">10</span>   <span class="co"># Number of tuning combinations to evaluate</span></span>
-<span id="cb30-24"><a href="#cb30-24" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>glm_spec <span class="ot">&lt;-</span> <span class="fu">linear_reg</span>(</span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>  <span class="at">penalty =</span> <span class="fu">tune</span>(),     </span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">mixture =</span> <span class="fu">tune</span>(),    <span class="co"># Mixutre (0 = Ridge, 1 = Lasso, values in between = Elastic Net)</span></span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>) <span class="sc">%&gt;%</span></span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">set_engine</span>(<span class="st">"glmnet"</span>)</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>glm_wflow <span class="ot">&lt;-</span></span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">workflow</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_recipe</span>(exp_recipe) <span class="sc">%&gt;%</span></span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">add_model</span>(glm_spec)</span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a>wr_folds <span class="ot">&lt;-</span> <span class="fu">vfold_cv</span>(train_data, <span class="at">v =</span> <span class="dv">5</span>)</span>
+<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-16"><a href="#cb28-16" aria-hidden="true" tabindex="-1"></a><span class="co"># Tune the hyperparameters using a grid of values</span></span>
+<span id="cb28-17"><a href="#cb28-17" aria-hidden="true" tabindex="-1"></a>glm_tune_results <span class="ot">&lt;-</span> <span class="fu">tune_grid</span>(</span>
+<span id="cb28-18"><a href="#cb28-18" aria-hidden="true" tabindex="-1"></a>  glm_wflow,</span>
+<span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a>  <span class="at">resamples =</span> wr_folds,</span>
+<span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a>  <span class="at">grid =</span> <span class="dv">10</span>   <span class="co"># Number of tuning combinations to evaluate</span></span>
+<span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>Tune Model w/ Cross Validation</p>
 <p>Examine Tuning Results</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Display tuning results</span></span>
-<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a>glm_tune_results <span class="sc">%&gt;%</span></span>
-<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect_metrics</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(.metric <span class="sc">==</span> <span class="st">"rmse"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(mean)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Display tuning results</span></span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>glm_tune_results <span class="sc">%&gt;%</span></span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">collect_metrics</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(.metric <span class="sc">==</span> <span class="st">"rmse"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(mean)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 10 × 8
     penalty mixture .metric .estimator  mean     n std_err .config              
       &lt;dbl&gt;   &lt;dbl&gt; &lt;chr&gt;   &lt;chr&gt;      &lt;dbl&gt; &lt;int&gt;   &lt;dbl&gt; &lt;chr&gt;                
- 1 2.00e- 7  0.574  rmse    standard   0.799     5 0.00334 Preprocessor1_Model06
- 2 1.36e- 6  0.840  rmse    standard   0.799     5 0.00334 Preprocessor1_Model09
- 3 2.26e- 5  0.352  rmse    standard   0.799     5 0.00336 Preprocessor1_Model04
- 4 2.32e- 9  0.499  rmse    standard   0.799     5 0.00333 Preprocessor1_Model05
- 5 1.53e- 8  0.0923 rmse    standard   0.799     5 0.00335 Preprocessor1_Model01
- 6 2.89e-10  0.801  rmse    standard   0.799     5 0.00333 Preprocessor1_Model08
- 7 4.89e- 4  0.909  rmse    standard   0.799     5 0.00333 Preprocessor1_Model10
- 8 9.91e- 3  0.651  rmse    standard   0.800     5 0.00331 Preprocessor1_Model07
- 9 5.00e- 2  0.237  rmse    standard   0.800     5 0.00332 Preprocessor1_Model02
-10 3.95e- 1  0.326  rmse    standard   0.816     5 0.00272 Preprocessor1_Model03</code></pre>
+ 1 8.38e- 7   0.469 rmse    standard   0.799     5 0.00167 Preprocessor1_Model05
+ 2 1.44e- 5   0.744 rmse    standard   0.799     5 0.00165 Preprocessor1_Model08
+ 3 4.65e- 6   0.670 rmse    standard   0.799     5 0.00164 Preprocessor1_Model07
+ 4 1.18e- 9   0.352 rmse    standard   0.799     5 0.00167 Preprocessor1_Model04
+ 5 1.00e- 8   0.287 rmse    standard   0.799     5 0.00167 Preprocessor1_Model03
+ 6 3.44e- 4   0.125 rmse    standard   0.799     5 0.00167 Preprocessor1_Model01
+ 7 2.35e-10   0.559 rmse    standard   0.799     5 0.00164 Preprocessor1_Model06
+ 8 1.43e- 3   0.168 rmse    standard   0.799     5 0.00165 Preprocessor1_Model02
+ 9 2.42e- 2   0.889 rmse    standard   0.802     5 0.00161 Preprocessor1_Model09
+10 2.36e- 1   0.990 rmse    standard   0.840     5 0.00206 Preprocessor1_Model10</code></pre>
 </div>
 </div>
-<p>Find the best parameters of the group. <code>finalize_workflow()</code> will choose the model with the optimal set of hyperparameters as found in <code>select_best()</code>.</p>
+<p>Find the best parameters of the group - <code>finalize_workflow()</code> will choose the model with the optimal set of hyperparameters as found in <code>select_best()</code>.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Select the best hyperparameters based on RMSE</span></span>
-<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>best_glm <span class="ot">&lt;-</span> <span class="fu">select_best</span>(glm_tune_results, <span class="at">metric =</span> <span class="st">'rmse'</span>)</span>
-<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Finalize the workflow with the best hyperparameters</span></span>
-<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>final_glm_workflow <span class="ot">&lt;-</span> <span class="fu">finalize_workflow</span>(glm_wflow, best_glm)</span>
-<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a>best_glm</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Select the best hyperparameters based on RMSE</span></span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>best_glm <span class="ot">&lt;-</span> <span class="fu">select_best</span>(glm_tune_results, <span class="at">metric =</span> <span class="st">'rmse'</span>)</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a><span class="co"># Finalize the workflow with the best hyperparameters</span></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>final_glm_workflow <span class="ot">&lt;-</span> <span class="fu">finalize_workflow</span>(glm_wflow, best_glm)</span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>best_glm</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 1 × 3
       penalty mixture .config              
         &lt;dbl&gt;   &lt;dbl&gt; &lt;chr&gt;                
-1 0.000000200   0.574 Preprocessor1_Model06</code></pre>
+1 0.000000838   0.469 Preprocessor1_Model05</code></pre>
 </div>
 </div>
-<p>^ Above you’ll find the optimal configuration of the model. We won’t get too far into the weeds here, but will not that the penalty term is small (low regularization, high complexity) and the mixture (type of regularization) indicates more of a Ridge regression (more shrinkage, less variable elimination).</p>
+<p>^ Above you’ll find the optimal configuration of the model. We won’t get too far into the weeds here, but will note that the penalty term is small (low regularization, high complexity) and the mixture (type of regularization) indicates more of a Ridge regression (more shrinkage, less variable elimination).</p>
 <p>Below, we’ll take the best model and fit it to the entire training data set before validating it against the test set.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Fit the finalized model on the entire training data</span></span>
-<span id="cb35-2"><a href="#cb35-2" aria-hidden="true" tabindex="-1"></a>final_glm_fit <span class="ot">&lt;-</span> <span class="fu">fit</span>(final_glm_workflow, <span class="at">data =</span> train_data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Fit the finalized model on the entire training data</span></span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>final_glm_fit <span class="ot">&lt;-</span> <span class="fu">fit</span>(final_glm_workflow, <span class="at">data =</span> train_data)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
+</section>
 </section>
 <section id="model-evaluation" class="level2">
 <h2 class="anchored" data-anchor-id="model-evaluation">Model Evaluation</h2>
@@ -583,17 +548,17 @@ Attaching package: 'Matrix'</code></pre>
 <h3 class="anchored" data-anchor-id="diagnostics">Diagnostics</h3>
 <p>Now that we have our model fit on the full training set, let’s evaluate it, check it’s reliability and it’s compliance with key assumptions.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Make predictions on the test set and tidy</span></span>
-<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>glm_predictions <span class="ot">&lt;-</span> <span class="fu">augment</span>(final_glm_fit, <span class="at">new_data =</span> test_data) <span class="sc">%&gt;%</span></span>
-<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">.pred_fp =</span> <span class="fu">exp</span>(.pred) <span class="sc">+</span> <span class="dv">1</span>,</span>
-<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">.resid =</span> fantasy_points <span class="sc">-</span> .pred_fp)</span>
-<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Evaluate the model's performance (RMSE)</span></span>
-<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>glm_metrics <span class="ot">&lt;-</span> glm_predictions <span class="sc">%&gt;%</span></span>
-<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">metrics</span>(<span class="at">truth =</span> fantasy_points, <span class="at">estimate =</span> .pred_fp)</span>
-<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Print the evaluation metrics</span></span>
-<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(glm_metrics)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Make predictions on the test set and tidy</span></span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>glm_predictions <span class="ot">&lt;-</span> <span class="fu">augment</span>(final_glm_fit, <span class="at">new_data =</span> test_data) <span class="sc">%&gt;%</span></span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">.pred_fp =</span> <span class="fu">exp</span>(.pred) <span class="sc">+</span> <span class="dv">1</span>,</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">.resid =</span> fantasy_points <span class="sc">-</span> .pred_fp)</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a><span class="co"># Evaluate the model's performance (RMSE)</span></span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>glm_metrics <span class="ot">&lt;-</span> glm_predictions <span class="sc">%&gt;%</span></span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">metrics</span>(<span class="at">truth =</span> fantasy_points, <span class="at">estimate =</span> .pred_fp)</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a><span class="co"># Print the evaluation metrics</span></span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a><span class="fu">print</span>(glm_metrics)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 3 × 3
   .metric .estimator .estimate
@@ -602,13 +567,43 @@ Attaching package: 'Matrix'</code></pre>
 2 rsq     standard       0.148
 3 mae     standard       4.21 </code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Distribution of predictors</span></span>
-<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>glm_predictions  <span class="sc">%&gt;%</span></span>
-<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> .resid)) <span class="sc">+</span></span>
-<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_histogram</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Distribution of predictors</span></span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>glm_predictions  <span class="sc">%&gt;%</span></span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> .resid)) <span class="sc">+</span></span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_histogram</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.</code></pre>
 </div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="wr_fantasy_pts_files/figure-html/unnamed-chunk-18-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Residuals vs fitted</span></span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(glm_predictions,<span class="fu">aes</span>(<span class="at">x =</span> .pred_fp, <span class="at">y=</span>.resid)) <span class="sc">+</span></span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>(<span class="at">se =</span> F) <span class="sc">+</span></span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="dv">0</span>,<span class="at">linetype =</span> <span class="st">"dashed"</span>,<span class="at">color =</span> <span class="st">"red"</span>)<span class="sc">+</span></span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Residuals vs. Fitted"</span>, <span class="at">y=</span> <span class="st">"Residuals"</span>,<span class="at">x =</span> <span class="st">"Fitted"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>`geom_smooth()` using method = 'gam' and formula = 'y ~ s(x, bs = "cs")'</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="wr_fantasy_pts_files/figure-html/unnamed-chunk-18-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(glm_predictions,<span class="fu">aes</span>(<span class="at">sample =</span> .resid)) <span class="sc">+</span></span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_qq</span>() <span class="sc">+</span></span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_qq_line</span>() <span class="sc">+</span></span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Q-Q Plot of Residuals"</span>) <span class="sc">+</span></span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -616,25 +611,20 @@ Attaching package: 'Matrix'</code></pre>
 </figure>
 </div>
 </div>
-<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Residuals vs fitted</span></span>
-<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(glm_predictions,<span class="fu">aes</span>(<span class="at">x =</span> .pred_fp, <span class="at">y=</span>.resid)) <span class="sc">+</span></span>
-<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
-<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_hline</span>(<span class="at">yintercept =</span> <span class="dv">0</span>,<span class="at">linetype =</span> <span class="st">"dashed"</span>,<span class="at">color =</span> <span class="st">"red"</span>)<span class="sc">+</span></span>
-<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Residuals vs. Fitted"</span>, <span class="at">y=</span> <span class="st">"Residuals"</span>,<span class="at">x =</span> <span class="st">"Fitted"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="wr_fantasy_pts_files/figure-html/unnamed-chunk-19-2.png" class="img-fluid figure-img" width="672"></p>
-</figure>
 </div>
-</div>
-</div>
+<p>While the histogram of residuals looks relatively normal. The other plots draw attention to some potential issues. Starting with the residuals vs.&nbsp;fits we’re seeing the points tail off on the right side. These points should be scattered randomly we can see a pattern. Similarly, with the QQPlot, the right side of the plot seems to tail well off course. It suggests first that the model struggles mightly with estimating large fantasy point values, it could be due to outliers and/or that a linear model may not be the best approach for this problem. This lines up with the inflated number of 0s seen in our target variable. We probably should not trust this model for valid inference or prediction and should continue to explore non-linear options or modifications to this model (i.e.&nbsp;variable interactions or transformations).</p>
+</section>
+<section id="variable-importance" class="level3">
+<h3 class="anchored" data-anchor-id="variable-importance">Variable Importance</h3>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(glm_predictions,<span class="fu">aes</span>(<span class="at">sample =</span> .resid)) <span class="sc">+</span></span>
-<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_qq</span>() <span class="sc">+</span></span>
-<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_qq_line</span>() <span class="sc">+</span></span>
-<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Q-Q Plot of Residuals"</span>) <span class="sc">+</span></span>
-<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>final_glm_fit <span class="sc">%&gt;%</span> </span>
+<span id="cb41-2"><a href="#cb41-2" aria-hidden="true" tabindex="-1"></a>  vip<span class="sc">::</span><span class="fu">vi</span>() <span class="sc">%&gt;%</span></span>
+<span id="cb41-3"><a href="#cb41-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">Importance =</span> <span class="fu">abs</span>(Importance),</span>
+<span id="cb41-4"><a href="#cb41-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">Variable =</span> <span class="fu">fct_reorder</span>(Variable,Importance)) <span class="sc">%&gt;%</span></span>
+<span id="cb41-5"><a href="#cb41-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> Importance, <span class="at">y =</span> Variable, <span class="at">fill =</span> Sign)) <span class="sc">+</span></span>
+<span id="cb41-6"><a href="#cb41-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>() <span class="sc">+</span></span>
+<span id="cb41-7"><a href="#cb41-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">0</span>)) <span class="sc">+</span></span>
+<span id="cb41-8"><a href="#cb41-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Impact"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -643,19 +633,23 @@ Attaching package: 'Matrix'</code></pre>
 </div>
 </div>
 </div>
-<p>This plot is a bit indicting as we can see the points at the end of the QQPlot start to tail off. It suggests that there are some outliers in fantasy points scored and/or a linear model may not be the best approach for this dataset. This lines up with the inflated number of 0s seen in our target variable. We probably should not trust this model for valid inference or prediction and should continue to explore non-linear options or modifications to this model (i.e.&nbsp;variable interactions or transformations).</p>
-</section>
-<section id="variable-importance" class="level3">
-<h3 class="anchored" data-anchor-id="variable-importance">Variable Importance</h3>
+<p>I’m not personally not a huge fan of variable importance plots because they don’t communicate the actual “importance” of the variable to the outcome of our target. In other words, they’re not that useful (by themselves) for inference. They really just measure the impact of the variables on predictions. I’ll take a few variables on this plot as examples.</p>
+<p>In this case, we can see that “wt_target_share” is defined as “Player’s share of team receiving targets in this game”.</p>
+<p>It makes sense that this has a positive impact on fantasy points scored as it directly describes fantasy opportunity for receivers. All else being equal, it’s likely that increased opportunity results in increased fantasy point value and we can reasonably say something like, “If a WR sees an increase in their opportuntiy rate due to increased skill, trust from coaches, injury to teammates, etc. we can can expect an increase in fantasy production”.</p>
+<p>However does “receiving_fumbles_lost” having a positive impact on the model seem reasonable? Considering that fantasy points are <strong>deducted</strong> when a player fumbles the ball in real life, this doesn’t make much sense. We’d be hard-pressed to convince anyone to target a player who fumbles the ball often. Why is this the case?</p>
+<p>It’s likely due to the afformentioned multicollinearity issue. In order to fumble the ball you must first have <strong>received it</strong>. The players with the highest number of fumbles are likely the ones getting the ball thrown their way the most and consequently getting increased opportunity to score more points in addition to fumbles. Below we can see “fumbles lost” as a function of receptions and target share, respectfully.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>final_glm_fit <span class="sc">%&gt;%</span> </span>
-<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>  vip<span class="sc">::</span><span class="fu">vi</span>() <span class="sc">%&gt;%</span></span>
-<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">Importance =</span> <span class="fu">abs</span>(Importance),</span>
-<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>         <span class="at">Variable =</span> <span class="fu">fct_reorder</span>(Variable,Importance)) <span class="sc">%&gt;%</span></span>
-<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> Importance, <span class="at">y =</span> Variable, <span class="at">fill =</span> Sign)) <span class="sc">+</span></span>
-<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_col</span>() <span class="sc">+</span></span>
-<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_continuous</span>(<span class="at">expand =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">0</span>)) <span class="sc">+</span></span>
-<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Impact"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(train_data, <span class="fu">aes</span>(<span class="at">x =</span> wt_receptions, <span class="at">y =</span> wt_receiving_fumbles_lost)) <span class="sc">+</span> </span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>() <span class="sc">+</span></span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Fumbles Lost"</span>, <span class="at">x =</span> <span class="st">"Receptions"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>`geom_smooth()` using method = 'gam' and formula = 'y ~ s(x, bs = "cs")'</code></pre>
+</div>
+<div class="cell-output cell-output-stderr">
+<pre><code>Warning: Removed 2693 rows containing non-finite outside the scale range
+(`stat_smooth()`).</code></pre>
+</div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -663,17 +657,9 @@ Attaching package: 'Matrix'</code></pre>
 </figure>
 </div>
 </div>
-</div>
-<p>I’m not personally not a huge fan of variable importance plots because they don’t communicate the actual “importance” of the variable to the outcome of our target. In other words, they’re not that useful (by themselves) for inference. They really just measure the impact of the variables on predictions. I’ll take a few variables on this plot as examples.</p>
-<p>In this case, we can see that “wt_target_share” is defined as “Player’s share of team receiving targets in this game”.</p>
-<p>It makes sense for this to have a positive impact on fantasy points scored as it directly describes fantasy opportunity for receivers. All else being equal, it’s likely that increased opportunity results in increased fantasy point value and we can reasonably say something like, “If a WR sees an increase in their opportuntiy rate due to increased skill, trust from coaches, injury to teammates, etc. we can can expect an increase in fantasy production”.</p>
-<p>However is “receiving_fumbles_lost”, the second highest impact, reasonable? Considering that fantasy points are <strong>deducted</strong> when a player fumbles the ball in real life, this doesn’t make much sense. We’d be hard-pressed to convince anyone to target a player who fumbles the ball often. Why is this the case?</p>
-<p>It’s likely due to an issue called collinearity. In order to fumble the ball you must first have <strong>received it</strong>. The players with the highest number of fumbles are likely the ones getting the ball thrown to their way the most and consequently getting increased opportunity to score more points in addition to fumbles. This is a prime example of an issue called multi-collinearity or a fancy way of saying that 2 predictors are highly correlated with each other. Below we can see “fumbles lost” as a function of receptions and target share, respectfully.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(train_data, <span class="fu">aes</span>(<span class="at">x =</span> wt_receptions, <span class="at">y =</span> wt_receiving_fumbles_lost)) <span class="sc">+</span> </span>
-<span id="cb43-2"><a href="#cb43-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>() <span class="sc">+</span></span>
-<span id="cb43-3"><a href="#cb43-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>() <span class="sc">+</span></span>
-<span id="cb43-4"><a href="#cb43-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Fumbles Lost"</span>, <span class="at">x =</span> <span class="st">"Receptions"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(train_data, <span class="fu">aes</span>(<span class="at">x =</span> wt_target_share, <span class="at">y =</span> wt_receiving_fumbles_lost)) <span class="sc">+</span> </span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>() <span class="sc">+</span></span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Fumbles"</span>, <span class="at">x=</span> <span class="st">"Target Share"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stderr">
 <pre><code>`geom_smooth()` using method = 'gam' and formula = 'y ~ s(x, bs = "cs")'</code></pre>
 </div>
@@ -684,24 +670,7 @@ Attaching package: 'Matrix'</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="wr_fantasy_pts_files/figure-html/unnamed-chunk-22-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(train_data, <span class="fu">aes</span>(<span class="at">x =</span> wt_target_share, <span class="at">y =</span> wt_receiving_fumbles_lost)) <span class="sc">+</span> </span>
-<span id="cb46-2"><a href="#cb46-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_smooth</span>() <span class="sc">+</span></span>
-<span id="cb46-3"><a href="#cb46-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">y =</span> <span class="st">"Fumbles"</span>, <span class="at">x=</span> <span class="st">"Target Share"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<div class="cell-output cell-output-stderr">
-<pre><code>`geom_smooth()` using method = 'gam' and formula = 'y ~ s(x, bs = "cs")'</code></pre>
-</div>
-<div class="cell-output cell-output-stderr">
-<pre><code>Warning: Removed 2693 rows containing non-finite outside the scale range
-(`stat_smooth()`).</code></pre>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="wr_fantasy_pts_files/figure-html/unnamed-chunk-22-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="wr_fantasy_pts_files/figure-html/unnamed-chunk-21-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -715,7 +684,6 @@ Attaching package: 'Matrix'</code></pre>
 <p><span class="citation" data-cites="Manual">@Manual</span>{, title = {nflreadr: Download ‘nflverse’ Data}, author = {Tan Ho and Sebastian Carl}, year = {2024}, note = {R package version 1.4.1.05, https://github.com/nflverse/nflreadr}, url = {https://nflreadr.nflverse.com}, }</p>
 
 
-</section>
 </section>
 
 </main> <!-- /main -->
