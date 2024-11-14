@@ -2,7 +2,7 @@
 title: "Predicting NFL Game Outcomes with nflfastR"
 author: "Sameer Sapre"
 date: "2024-06-30"
-categories: [news, code, analysis] 
+categories: [code, analysis] 
 image: "nflfastR.png"
 execute: 
   warning: false

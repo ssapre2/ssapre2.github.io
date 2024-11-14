@@ -2,7 +2,7 @@
 title: "Predicting Wide Receiver Fantasy Points w/ Tidymodels"
 author: "Sameer Sapre"
 date: "2024-09-16"
-categories: [news, code, analysis]
+categories: [code, analysis]
 image: "crystal-ball.jpg"
 #draft: TRUE
 editor: visual
