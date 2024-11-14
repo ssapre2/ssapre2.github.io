@@ -12,6 +12,7 @@ editor: visual
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
 ## Introduction
 
 I've played fantasy football for a decade and have always wondered how ESPN (and Yahoo, Sleeper, etc.) make their fantasy projections week to week. Where are they getting their estimates from? Why is Ja'Marr Chase projected to score 16.3 points for me this week? Why does his projection increase by that much (or that little) if Tee Higgins happens to be out injured? Perhaps we won't get a chance to peak inside of ESPN's crystal ball, but maybe we can try to build our own!
@@ -22,6 +23,7 @@ We'll go step by step through data cleaning, feature engineering, model selectio
 
 ## R Markdown
 
+
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 library(nflreadr)
@@ -31,9 +33,11 @@ library(naniar)
 library(TTR)
 ```
 
+
 ## Data Load
 
 We'll start by loading in directly relevant player statistics and depth chart information before joining them together.
+
 
 ```{r message=FALSE, warning=FALSE}
 stats = load_player_stats(seasons = seq(2006,2023))
@@ -60,9 +64,11 @@ wr_data <- stats %>%
 ```
 
 
+
 ## Missingness
 
 Let's check if there are any missing values in the dataset we've created. We'll use the library `naniar` to do so.
+
 
 ```{r}
 
@@ -78,11 +84,13 @@ df_miss %>%
 # What if we take out racr?
 ```
 
+
  Ideally, we would like to impute these values, but for brevity, we'll filter out the NA's of 'racr'.
 
 ## Time Weighting
 
 We want our predictions for each player to be based on their past performance. However, we'd like the most recent performances to be weighed heaviest. To do that, we can introduce a simple time-weighting scheme. In the function below, we take a data vector (ex. receptions) and return a weighted average based on the length of the vector.
+
 
 
 ```{r}
@@ -106,7 +114,9 @@ weighted_avg = function(metric_vector){
 
 ```
 
+
 Now that we have our simple time-weighting built, let's make use of Davis Vaughn's [slider](https://slider.r-lib.org/articles/slider.html) package. It's a tidy way to calculate sliding window summaries. We'll do that to create a set of potential numeric predictors.
+
 
 ```{r}
 library(slider)
@@ -127,19 +137,23 @@ wr_data %>%
 
 ```
 
+
 Let's use the example of Brandon Aiyuk as a sanity check.
+
 
 ```{r}
 ma_wr %>%
   filter(season == 2023, player_id == '00-0036261') %>%
   select(player_name,week,targets,wt_targets, receptions,wt_receptions, receiving_yards,wt_receiving_yards)
 ```
+
 A quick scan shows that our time weighted averages are calculated as intended.
 
 
 ## Correlations
 
 Before we start splitting data for the model, let's take a look at variable correlations. This may influence our model choices.
+
 
 ```{r}
 # Calculate the correlation matrix
@@ -160,10 +174,12 @@ ggplot(data = cor_data, aes(x = Var1, y = Var2, fill = value)) +
 
 ```
 
+
 Okay, the heatmap here shows a lot of red. It looks like there is a high degree of multicollinearity between our weighted measures. We'll touch on this issue, but won't fully address it in this post. Just be aware that it can make inference and interpretation of a linear model quite difficult.
 
 
 In addition, if we look at our target variable, we notice something interesting... it has a skewed distribution. What does this tell us about using a linear model? 
+
 
 ```{r}
 ma_wr %>%
@@ -171,7 +187,9 @@ ma_wr %>%
     geom_histogram()
 ```
 
+
 Let's see what happens if we transform our target with a log-transform.
+
 
 ```{r}
 ma_wr %>%
@@ -179,11 +197,13 @@ ma_wr %>%
   geom_histogram()
 ```
 
+
 Hmmm, our histogram still looks a bit funky. The distribution seems to have shifted closer to a bell curve we'd want for linear regression, but there are A LOT of 0s (more on that later). For now, we'll trudge ahead and start preparing the modeling pipeline in `tidymodels` with this transformed variable as our target.
 
 ## Preprocess
 
 We'll start by splitting our dataset into training and testing splits and create recipes for preprocessing in the following blocks.
+
 
 ```{r}
 library(tidymodels)
@@ -204,8 +224,6 @@ train_data <- training(data_split)
 test_data  <- testing(data_split)
 ```
 
-
-
 ```{r}
 test_data %>%
   filter(!is.na(wt_receptions)) -> test_data
@@ -213,7 +231,9 @@ test_data %>%
 sum(colSums(is.na(test_data)))
 ```
 
+
 ## Model Building 
+
 
 ```{r}
 
@@ -233,6 +253,7 @@ exp_recipe = train_data  %>%
 
 ```
 
+
 ## Cross-Validation + Tuning 
 
 
@@ -240,6 +261,7 @@ exp_recipe = train_data  %>%
 
 We'll train a general linear model (GLM). This is a type of linear regression which provides built-in variable selection through a process called *regularization*. The nuts and bolts of this modeling strategy are beyond the scope of this post, but for those interested in learning, there are tons of material on this concept anywhere on the internet. Here's a [good reference](https://dataanalyticsbook.info/chapter-8.-scalability-lasso-pca.html#chapter-8.-scalability-lasso-pca)
  from UW professor Shuai Huang.
+
 
 ```{r}
 library(glmnet)
@@ -270,7 +292,9 @@ glm_tune_results <- tune_grid(
 ```
 
 
+
 Examine Tuning Results
+
 
 ```{r}
 # Display tuning results
@@ -281,7 +305,9 @@ glm_tune_results %>%
   arrange(mean)
 ```
 
+
 Find the best parameters of the group - `finalize_workflow()` will choose the model with the optimal set of hyperparameters as found in `select_best()`.
+
 
 ```{r}
 # Select the best hyperparameters based on RMSE
@@ -293,9 +319,11 @@ final_glm_workflow <- finalize_workflow(glm_wflow, best_glm)
 best_glm
 ```
 
+
 \^ Above you'll find the optimal configuration of the model. We won't get too far into the weeds here, but will note that the penalty term is small (low regularization, high complexity) and the mixture (type of regularization) indicates more of a Ridge regression (more shrinkage, less variable elimination). 
 
 Below, we'll take the best model and fit it to the entire training data set before validating it against the test set.
+
 
 ```{r}
 # Fit the finalized model on the entire training data
@@ -304,11 +332,13 @@ final_glm_fit <- fit(final_glm_workflow, data = train_data)
 ```
 
 
+
 ## Model Evaluation
 
 ### Diagnostics
 
 Now that we have our model fit on the full training set, let's evaluate it, check it's reliability and it's compliance with key assumptions.
+
 
 ```{r}
 # Make predictions on the test set and tidy
@@ -336,7 +366,6 @@ ggplot(glm_predictions,aes(x = .pred_fp, y=.resid)) +
   labs(title = "Residuals vs. Fitted", y= "Residuals",x = "Fitted")
 ```
 
-
 ```{r}
 ggplot(glm_predictions,aes(sample = .resid)) +
   geom_qq() +
@@ -345,10 +374,12 @@ ggplot(glm_predictions,aes(sample = .resid)) +
   theme_minimal() 
 ```
 
+
 While the histogram of residuals looks relatively normal. The other plots draw attention to some potential issues. Starting with the residuals vs. fits, we're seeing the points tail off on the right side. These points should be scattered randomly we can see a pattern. Similarly, with the QQPlot, the right side of the plot seems to tail well off course. It suggests first that the model struggles mightly with estimating large fantasy point values, it could be due to outliers and/or that a linear model may not be the best approach for this problem. This lines up with the inflated number of 0s seen in our target variable. We probably should not trust this model for valid inference or prediction and should continue to explore non-linear options or modifications to this model (i.e. variable interactions or transformations).  
 
 
 ### Variable Importance
+
 
 ```{r}
 final_glm_fit %>% 
@@ -362,6 +393,7 @@ final_glm_fit %>%
   
 ```
 
+
 I'm personally not a huge fan of variable importance plots because they don't communicate the actual "importance" of the variable to the outcome of our target. In other words, they're not that useful and can be misleading (by themselves) for inference. They just measure the impact of the variables on predictions. I'll take a few variables on this plot as examples.
 
 In this case, we can see that "wt_target_share" is defined as "Player's share of team receiving targets in this game".
@@ -371,6 +403,7 @@ It makes sense that this has a positive impact on fantasy points scored as it di
 However, does "receiving_fumbles_lost" having a positive impact on projected fantasy points seem reasonable? Considering that fantasy points are **deducted** when a player fumbles the ball away in real life, this doesn't make much sense. We'd be hard-pressed to convince anyone to target a player who fumbles the ball often. Why is this the case?
 
 It's likely due to the afformentioned multicollinearity issue. In order to fumble the ball a player must first have **received it**. The players with the highest number of fumbles are likely the players that receive the ball most often (players that the offense wants to get the ball to) and consequently get increased opportunity to score more points in addition to fumbles. Below we can see "fumbles lost" as a function of receptions and target share, respectfully.
+
 
 ```{r}
 ggplot(train_data, aes(x = wt_receptions, y = wt_receiving_fumbles_lost)) + 
@@ -385,6 +418,7 @@ ggplot(train_data, aes(x = wt_target_share, y = wt_receiving_fumbles_lost)) +
 
 
 
+
 As mentioned earlier, the regularized model handles variable selection but does not completely remove the effects of multicollinearity. Multicollinearity makes inference very challenging and we will likely need a model better suited for non-linear relationships or to include more interactions to improve model performance and interpretability.
 
 ## Conclusion
@@ -395,6 +429,7 @@ This was a good first step in creating a model for my fantasy football needs. Th
 ###
 
 Ho T, Carl S (2024). nflreadr: Download 'nflverse' Data. R package version 1.4.1.05, https://github.com/nflverse/nflreadr, https://nflreadr.nflverse.com.
+
 
 
 
