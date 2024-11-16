@@ -1,0 +1,56 @@
+
+
+
+```{r}
+library('nflfastR')
+library("tidyverse")
+library('pROC')
+library('tidymodels')
+```
+
+
+
+```{r}
+data <- load_pbp(2019)
+```
+
+```{r}
+pass_plays = data %>% filter(play_type == 'pass')
+
+# Check the unique play results
+pass_plays %>%
+  group_by(play_type_nfl) %>%
+  tally()
+
+  
+```
+
+Here are the possible play results for passing plays. We'll focus on sacks, pass (complete/incomplete) and interceptions.
+
+```{r}
+pass_plays %>% 
+  select(complete_pass,incomplete_pass,sack,interception,epa) %>%
+  pivot_longer(cols = c(complete_pass:interception),names_to = "play_result") %>%
+  filter(value == 1) %>%
+  group_by(play_result) %>%
+  summarise(EPA = mean(epa,na.rm = T),.prop = n()/ nrow(.),ev = EPA *.prop) %>%
+  ungroup() %>%
+  mutate(plot_color = ifelse(EPA < 0, "red", "blue")) %>%
+  ggplot(aes(x = play_result, y = EPA,fill = plot_color)) +
+  geom_col() + 
+  geom_text(aes(label = round(EPA,2))) +
+  labs(title = "Average Expected Points Added", x = "Result", y = "EPA") +
+  theme_minimal() +
+  guides(fill="none") + 
+  scale_fill_brewer(palette = "Reds")
+  
+```
+Here we have a graph of average expected points added per play result. Interceptions are far an away the worst play to have as it quite literally ends the drive and gives the ball right to the other team. Sacks, however, prove to be far worse than the incompletions losing more than double the amount of points then throwing an incomplete pass. It's why you sometimes here TV announcers yell "Get rid of it!" when they see a QB under pressure - taking a sack can lose you almost 2 point!
+
+
+Now that we have our motiviation, let's try to identify which current day QBs are the best at avoiding sacks.
+
+```{r}
+
+```
+
