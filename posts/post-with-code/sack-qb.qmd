@@ -50,7 +50,12 @@ Here we have a graph of average expected points added per play result. Intercept
 
 Now that we have our motiviation, let's try to identify which current day QBs are the best at avoiding sacks.
 
-```{r}
 
+Split time in minutes, seconds
+```{r}
+pass_plays %>%
+  separate(col = time, into = c("mins","sec"), sep = ":") %>%
+  separate(col = end_clock_time, into = c("end_mins","end_sec"),sep = ":") %>%
+  select(contains("mins"))
 ```
 
