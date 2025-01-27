@@ -11,7 +11,7 @@ library('tidymodels')
 
 
 ```{r}
-data <- load_pbp(2019)
+data <- load_pbp(2024)
 ```
 
 ```{r}
@@ -24,6 +24,109 @@ pass_plays %>%
 
   
 ```
+
+## EPA Adjustment -------------
+
+```{r}
+data %>%
+    dplyr::filter(!is.na(epa), !is.na(ep), !is.na(posteam), play_type == "pass" | play_type == "run") %>%
+    dplyr::group_by(game_id, season, week, posteam, home_team) %>%
+    dplyr::summarise(
+        off_epa = mean(epa),
+    ) %>%
+    dplyr::left_join(data %>%
+                         filter(!is.na(epa), !is.na(ep), !is.na(posteam), play_type == "pass" | play_type == "run") %>%
+                         dplyr::group_by(game_id, season, week, defteam, away_team) %>%
+                         dplyr::summarise(def_epa = mean(epa)),
+                     by = c("game_id", "posteam" = "defteam", "season", "week")
+    ) %>%
+    dplyr::mutate(opponent = ifelse(posteam == home_team, away_team, home_team)) %>%
+    dplyr::select(game_id, season, week, home_team, away_team, posteam, opponent, off_epa, def_epa) -> epa_data
+```
+
+
+```{r}
+# Construct opponent dataset and lag the moving average of their last ten games.
+opponent_data <- epa_data %>%
+  dplyr::select(-opponent) %>%
+  dplyr::rename(
+    opp_off_epa = off_epa,
+    opp_def_epa = def_epa
+  ) %>%
+  dplyr::group_by(posteam) %>%
+  dplyr::arrange(season, week) %>%
+  dplyr::mutate(
+    opp_def_epa = pracma::movavg(opp_def_epa, n = 9, type = "s"),
+    opp_def_epa = dplyr::lag(opp_def_epa),
+    opp_off_epa = pracma::movavg(opp_off_epa, n = 9, type = "s"),
+    opp_off_epa = dplyr::lag(opp_off_epa)
+  )
+
+# Merge opponent data back in with the weekly epa data
+epa_data <- epa_data %>%
+  left_join(
+    opponent_data,
+    by = c("game_id", "season", "week", "home_team", "away_team", "opponent" = "posteam")
+  )
+```
+
+
+```{r}
+epa_data <- epa_data %>%
+  dplyr::left_join(epa_data %>%
+    dplyr::filter(posteam == home_team) %>%
+    dplyr::group_by(season, week) %>%
+    dplyr::summarise(
+      league_mean = mean(off_epa + def_epa)
+    ) %>%
+    dplyr::ungroup() %>%
+    dplyr::group_by(season) %>%
+    dplyr::mutate(
+      league_mean = lag(pracma::movavg(league_mean, n = 10, type = "s"), ) # We lag because we need to know the league mean up to that point in the season
+    ),
+  by = c("season", "week")
+  )
+```
+
+
+```{r}
+# Adjust EPA
+epa_data_adj <- epa_data %>%
+  dplyr::mutate(
+    off_adjustment_factor = ifelse(!is.na(league_mean), league_mean - opp_def_epa, 0),
+    def_adjustment_factor = ifelse(!is.na(league_mean), league_mean - opp_off_epa, 0),
+    adjusted_off_epa = off_epa + off_adjustment_factor,
+    adjusted_def_epa = def_epa + def_adjustment_factor,
+  )
+```
+
+
+Plot differences
+
+```{r}
+
+epa_data_adj %>%
+  group_by(posteam) %>%
+  summarise(across(c(off_epa,adjusted_off_epa),mean),n()) %>%
+ggplot() +
+  geom_segment(aes(x=off_epa, xend=adjusted_off_epa, y=posteam, yend=posteam), color="grey") +
+  geom_point( aes(x=off_epa, y=posteam), color=rgb(0.2,0.7,0.1,0.5), size=3 ) +
+  geom_point( aes(x=adjusted_off_epa, y=posteam), color=rgb(0.7,0.2,0.1,0.5), size=3 ) +
+  #coord_flip()+
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+  ) +
+  ylab("EPA Adjustment") +
+  xlab("Team")
+```
+
+
+
+
+
+
+
 
 Here are the possible play results for passing plays. We'll focus on sacks, pass (complete/incomplete) and interceptions.
 

@@ -1,0 +1,20 @@
+---
+title: "Advent of Code 2024 Day 4: Ceres Search"
+date: "2025-01-08"
+categories: [code]
+format:
+  html:
+    code-fold: true
+jupyter: python3
+---
+
+
+Last year (3 weeks ago), I tried my hand at my first programming competition. That's right, my C+ in my freshman year programming class was
+not going to deter me from an actually very set of Christmas themed puzzles provided by the Advent of Code challenge introduced to me by a friend. As
+someone who previosly viewed programming as a necessary obstacle to finishing an interesting sports analytics project, I was pleasently surprised
+by how fun it actually was. Though I didn't finish all 31 challenges, I was able to complete a few as a much needed break from Christmas with my 
+family (love you guys) and thought I'd share my solution to one of my problems.
+
+You can find the other problems I attempted at this repo, but without further ado, let's get into Day 4: Ceres Search.
+
+Naturally, as any realistic novice does, I started not at day 1,2, or 3, but 4... patience is clearly my virtue.
