@@ -1,0 +1,303 @@
+---
+title: "Predicting NFL Game Outcomes in R (part 2)"
+author: "Sameer Sapre"
+date: "2025-01-27"
+categories: [code, analysis,NFL] 
+image: "tuning.png"
+execute: 
+  warning: false
+page-layout: full
+---
+
+
+
+## Intro
+
+Hello everyone! In the [first post I shared on modeling NFL game outcomes](https://ssapre2.github.io/posts/nfl-game-prediction/), I shared a simple way to create a NFL game prediction model using  `nflreadR` and `tidymodels`. In this post, I'll share a simple way to improve our model using *cross-validation*.
+
+
+I'll skip the data cleaning portion since it's the same as the previous post. Ideally, I'd package these steps into a function as part of a larger package to spare you the time and make this process neater, repeatable, and editable. However, I'm not feeling very generous today (aka I'm too lazy), so I've copied and pasted the setup code in the hidden cell below.
+
+
+```{r}
+#| code-fold: true
+library('nflreadr')
+library("tidyverse")
+library('pROC')
+library('tidymodels')
+
+# Scrape schedule Results
+load_schedules(seasons = seq(2011,2024)) -> nfl_game_results 
+
+nfl_game_results %>%
+  # Remove the upcoming season
+  pivot_longer(cols = c(away_team,home_team),
+               names_to = "home_away",
+               values_to = "team") %>%
+  mutate(team_score = ifelse(home_away == "home_team",yes = home_score,no = away_score),
+         opp_score = ifelse(home_away == "home_team", away_score,home_score)) %>%  # sort for cumulative avg
+  arrange(season,week) %>%
+  select(season,game_id,team,team_score,opp_score,week) -> team_games
+
+team_games %>%
+  arrange(week) %>%
+  group_by(season,team) %>%
+  # For each team's season calculate the cumulative scores for after each week
+  mutate(cumul_score_mean = cummean(team_score),
+          cumul_score_opp = cummean(opp_score),
+          cumul_wins = cumsum(team_score > opp_score),
+          cumul_losses = cumsum(team_score < opp_score),
+          cumul_ties = cumsum(team_score == opp_score),
+         cumul_win_pct = cumul_wins / (cumul_wins + cumul_losses),
+         # Create the lag variable
+         cumul_win_pct_lag_1 = lag(cumul_win_pct,1),
+         cumul_score_lag_1 = lag(cumul_score_mean,1),
+         cumul_opp_lag_1 = lag(cumul_score_opp,1)
+         ) %>%
+  # Non-lag variables leak info
+  select(week,game_id,contains('lag_1')) %>%
+  ungroup() -> cumul_avgs
+
+# Calculate average win pct.
+team_games %>%
+  group_by(season,team) %>%
+  summarise(wins = sum(team_score > opp_score),
+            losses = sum(team_score < opp_score),
+            ties = sum(team_score == opp_score))%>%
+  ungroup() %>%
+  arrange(season) %>%
+  group_by(team) %>%
+  mutate(win_pct = wins / (wins + losses),
+         lag1_win_pct = lag(win_pct,1)) %>%
+  ungroup() -> team_win_pct
+
+# Load depth charts and injury reports
+dc = load_depth_charts(seq(2011,most_recent_season()))
+injuries = load_injuries(seq(2011,most_recent_season()))
+
+injuries %>%
+  filter(report_status == "Out") -> out_inj
+
+dc %>% 
+  filter(depth_team == 1) -> starters
+
+# Determine roster position of injured players
+starters %>%
+  select(-c(last_name,first_name,position,full_name)) %>%
+  inner_join(out_inj, by = c('season','club_code' = 'team','gsis_id','game_type','week')) -> injured_starters
+
+# Number of injuries by position
+injured_starters %>%
+  group_by(season,club_code,week,position) %>%
+  summarise(starters_injured = n()) %>%
+  ungroup() %>%
+  pivot_wider(names_from = position, names_prefix = "injured_",values_from = starters_injured) -> injuries_position
+
+nfl_game_results %>%
+  inner_join(cumul_avgs, by = c('game_id','season','week','home_team' = 'team')) %>%
+  inner_join(cumul_avgs, by = c('game_id','season','week','away_team' = 'team'),suffix = c('_home','_away'))-> w_avgs
+
+# Check for stragglers
+nfl_game_results %>%
+  anti_join(cumul_avgs, by = c('game_id','season','home_team' = 'team','week')) -> unplayed_games
+
+
+# Indicate whether home team won
+w_avgs %>%
+  mutate(home_win = as.numeric(result > 0)) -> matchups
+
+matchups %>%
+  left_join(injuries_position,by = c('season','home_team'='club_code','week')) %>%
+  left_join(injuries_position,by = c('season','away_team'='club_code','week'),suffix = c('_home','_away')) %>%
+  mutate(across(starts_with('injured_'), ~replace_na(.x, 0))) -> matchup_full
+
+# Remove unneeded columns
+matchup_full %>%
+  select(-c(home_score,away_score,overtime,home_team,away_team,away_qb_name,home_qb_name,referee,stadium,home_coach,away_coach,ftn,espn,old_game_id,gsis,nfl_detail_id,pfr,pff,result)) -> matchup_ready
+
+
+# Remove columns
+matchup_ready = matchup_ready%>%
+  # Transform outcome into factor variable
+  select(where(is.numeric),game_id) %>% 
+  mutate(home_win = as.factor(home_win)) 
+```
+
+
+Long story short, I want each row in the final dataset to represent an NFL game with each team's :
+1. Previous performance
+2. Injuries
+3. Opponent's previous performance
+4. Opponent's injuries
+
+There are definitely better ways to represent the pieces of information than I'm doing above (please let me know!), but I will focus on model tuning as the approach to improving model performance today.
+
+With that, I'll start directly from the modeling portion of the code. In the sections below, you'll see our basic `tidymodels` setup using our `recipes` object for pre-processing.
+
+
+```{r}
+library('tidymodels')
+
+# Split Data
+set.seed(123)
+matchups24 = matchup_ready %>% filter(season == 2024)
+splits = matchup_ready %>% 
+  filter(season != 2024) %>%
+  initial_split(prop = 0.7)
+train_data <- training(splits)
+test_data  <- testing(splits)
+```
+
+```{r}
+
+rec_impute = recipe(formula = home_win ~ .,
+                 data = train_data) %>%
+  #create ID role (do not remove) game ID. We'll use this to match predictions to specific games
+  update_role(game_id, new_role = "ID")%>%
+  step_zv(all_predictors()) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  #for each numeric variable/feature, replace any NA's with the median value of that variable/feature
+  step_impute_median(all_numeric_predictors()) 
+
+# Create recipe to for moneyline model
+```
+
+
+Here, we can see what the medians (NA-filler) values for each predictor.
+
+
+```{r}
+imp_models <- rec_impute %>%
+  check_missing(all_numeric_predictors()) %>%
+  prep(training = train_data)
+
+# Check the predictors that were filtered out
+nzv_step <- imp_models$steps[[2]]  # Access the step_nzv object
+removed_predictors <- nzv_step$removals
+
+# Display removed predictors
+removed_predictors
+
+# Check if imputation worked
+imp_models %>%
+  bake(train_data) %>%
+  is.na() %>%
+  colSums()
+
+tidy(imp_models,number = 1)
+```
+
+
+
+
+## Modeling 
+
+Last time, we did this step without introducing any sort of parameter tuning. This time, we'll try to tune our logistic regression to see if that results in better (and more trustworthy) prediction accuracy. You can see in the `glm_spec` variable we introduce two new lines, `penalty = tune()` and `mixture = tune()`. What does that mean?
+
+In logistic regression, we have the option of introducing something called **regularization**, which is just a fancy word for telling the model "don't overcomplicate things!". As you saw in the feature enigneering steps in the last post, there are a lot of variables and in many real world models (AI models included) the number of parameters can be in the billions! This is often too much information to pare down, so regularization is a simple step to help the model focus on the most important stuff. 
+This extra step helps the model avoid a common ML pitfall - **overfitting**. Think of it like this, imagine you have a math test tomorrow and your friend sends you the solutions to the practice exam. You study by memorizing the answers to practce exam (not by DOING the problems). The next day to open your test and ... shoot... you have to SHOW your work?? You don't even know where to start. That is overfitting, you've memorized the answers, but you don't know HOW to solve the problems or complete the process.
+
+Regularization is a way to penalize the model from memorizing inputs and instead forces it to make generalizations about relationships in the data (aka learn general patterns). You sacrifice a bit accuracy, for example, maybe you mix up some calculations on the exam incorrect, but you get partial credit for showing proper process.
+
+There are some other pros and cons to regularization, but I'll leave that for you to research yourself.
+
+
+```{r}
+library('glmnet')
+# Penalized Linear Regression
+
+
+glm_spec <- logistic_reg(
+  penalty = tune(),     
+  mixture = tune(),    # Mixutre (0 = Ridge, 1 = Lasso, values in between = Elastic Net)
+    
+) %>%
+  set_engine("glmnet")
+
+# Setup workflow
+glm_wflow <-
+  workflow() %>% 
+  add_recipe(rec_impute) %>%
+  add_model(glm_spec)
+
+# Create cross validation splits
+folds <- vfold_cv(train_data, v = 5)
+
+# Tune the hyperparameters using a grid of values
+glm_tune_results <- tune_grid(
+  glm_wflow,
+  resamples = folds,
+  grid = 10   # Number of tuning combinations to evaluate
+)
+
+```
+
+
+Next, let's take a look at the results. We're primarily concerned with **brier score** since we want to measure how well our predicted probabilies are *calibrated* to actual results. Calibration refers to how well the predicted probabilities from a model match the actual observed outcomes. A well-calibrated model means that if it predicts a 70% chance of an event happening, the event should occur about 70% of the time in reality. For example, if a model predicts a team wins 60% of the time, the team should win about 60% of the time.
+
+Brier score is a representation of that calibration on a 0-1 scale. The *lower* the score, the better Seeing a slight reduction in brier score between the last attempt (0.229) and this attempt (0.214) is good! If we want to go the extra mile, we can test the significance of the difference across CV folds to determine if this reduction is significant.
+
+
+```{r}
+# Display tuning results
+glm_tune_results %>%
+  collect_metrics() %>%
+  filter(.metric == "brier_class") %>%
+  arrange(mean) %>%
+  slice(1)
+```
+
+
+Looks like the combo of scaling, cross-validation lead us to better model calibration!
+
+
+```{r}
+# Select the best hyperparameters based on RMSE
+best_glm <- select_best(glm_tune_results, metric = 'brier_class')
+
+# Finalize the workflow with the best hyperparameters
+final_glm_workflow <- finalize_workflow(glm_wflow, best_glm)
+
+best_glm
+```
+
+```{r}
+# Fit the finalized model on the entire training data
+final_glm_fit <- fit(final_glm_workflow, data =train_data)
+```
+
+
+
+Let's try out our new evaluation metric to check how well our model is calibrated with the actual output. The graph below is calibration plot. It tells us how aligned our predictions are with the actual observed outcomes. The x-axis is straightforward - it represents our predicted probabilities. The Y-Axis, however, is the proportion of *positive* observations. This displays our **home_win** outcome variable as a proportion so we can compare on the scale of the predicted probability class.
+
+
+```{r}
+# Align predictions to test dataset
+predicted_df = augment(final_glm_fit,test_data) 
+predicted_df |> 
+  mutate(bin = cut(.pred_1, breaks = seq(0, 1, by = 0.1), include.lowest = TRUE)) %>%
+  group_by(bin) %>%
+  summarise(
+    avg_predicted = mean(.pred_1),
+    observed_proportion = mean(as.numeric(home_win)-1,na.rm = T),
+    n = n()
+  ) |> 
+  ggplot(aes(x = avg_predicted, y = observed_proportion)) +
+  geom_point() +
+  geom_line() +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(
+    title = "Calibration Plot",
+    x = "Mean Predicted Probability",
+    y = "Observed Proportion"
+  ) +
+  theme_minimal()
+```
+
+
+It looks like in this case, the model is better calibrated (in-line with actual results) for games between a 50-70% win pct for the home team. This doesn't tell us much other than that the model is unreliable on the extreme margins, however, NFL games rarely have games with such extreme dogs/favorites. 
+
+Regularization and model tuning is just one way to improve model perforance. In the next post, we'll likely take another crack at improving this model. Thank you for reading and feel free to reach out to me with any questions/suggestions!
+
+
+

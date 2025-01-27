@@ -1,5 +1,5 @@
 ---
-title: "Predicting NFL Game Outcomes w/ tidymodels & nflreadR"
+title: "Predicting NFL Game Outcomes in R (part 1)"
 author: "Sameer Sapre"
 date: "2024-06-30"
 categories: [code, analysis] 
