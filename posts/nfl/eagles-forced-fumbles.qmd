@@ -9,3 +9,15 @@ Fellows Birds fans, join me in rejoicing a second Super Bowl appearance in 3 yea
 The 10 playoff rushing touchdowns notwithstanding, one of the anchors of our playoff run has been our defense. Led by coordinator Vic Fangio, this group has been the epitome of bend, but don't break and has emerged as one of the best defenses in the league this season. 
 
 One of the eye-opening parts of watching this defense in the playoffs have been the takeaways, specifically the fumbles forced, that changed the dynamics of these games in a big way. Only the 2019 49ers defense has more more forced fumbles (30) than the 2024 Eagles (29).
+
+
+```{r}
+load_nextgen_stats(
+  seasons = TRUE,
+  stat_type = c("defense"),
+  file_type = getOption("nflreadr.prefer", default = "rds")
+)
+```
+
+
+
