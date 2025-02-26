@@ -20,4 +20,14 @@ load_nextgen_stats(
 ```
 
 
+```{r}
+#Load in some data
+stats = load_player_stats(seasons = seq(2006,2023),stat_type = 'defense')
+
+stats |>
+  group_by(team,week,season) |>
+  summarise(total_tackles = sum(def_tackles),forced_fumbles = sum(def_fumbles_forced)) -> weekly_fumbles_by_team
+```
+
+
 
