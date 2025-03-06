@@ -17,9 +17,10 @@ about:
 ---
 
 Hello everyone! 
-My name is Sameer Sapre and I am a data analyst with the Seattle Mariners and a graduate student at the University of Washington studying Industrial Engineering.
-I graduated from Penn State University in 2020 with a B.S. in Data Sciences and previously worked for Mars, Inc.
-Outside of work, I'm the President of my [local Toastmasters chapter (please join!)](https://www.toastmasters.org/Find-a-Club/01417617-01417617) and a youth soccer coach with Seattle Parks and Rec. 
+My name is Sameer Sapre and I am a Data Scientist with the Seattle Reign of the National Women's Soccer League (NWSL) and was previously working in the analytics department of the Seattle Mariners.
+I graduated from Penn State University in 2020 with a B.S. in Data Sciences and completed internships with Mars, Inc and Penn State's Applied Health and Performance Science department.
+Outside of work, I'm the President of my [local Toastmasters chapter (please join!)](https://www.toastmasters.org/Find-a-Club/01417617-01417617), a youth soccer coach with Seattle Parks and Rec,
+and a volunteer with Seattle Theatre Group. 
 
 
 
