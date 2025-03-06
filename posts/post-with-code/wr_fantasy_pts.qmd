@@ -221,9 +221,7 @@ exp_recipe = train_data  %>%
   recipe(log_fantasy_points ~ .,) %>%
   update_role(c(player_id,recent_team,fantasy_points,fantasy_points_ppr,fantasy_points_target),new_role = 'ID') %>%
   # Generally not recommended to throw out all data, but for brevity, let's remove NAs
-  #step_naomit(all_numeric_predictors()) %>%
   step_impute_median(all_numeric_predictors()) %>%
-
  # Remove zero variance predictors (ie. variables that contribute nothing to prediction)
   step_zv(all_predictors()) %>%
   step_center(all_numeric_predictors())

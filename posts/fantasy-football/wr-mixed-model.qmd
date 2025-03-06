@@ -1,0 +1,74 @@
+---
+title: "Predicting Wide Receiver Fantasy Points w/ Tidymodels Pt 2"
+subtitle: "Mixed Models"
+author: "Sameer Sapre"
+date: "2024-09-16"
+categories: [code, analysis]
+#draft: TRUE
+editor: visual
+---
+
+I made a slight mistake. I broke a core assumption of linear regression that I made in the previous edition of the model. To use linear regression, one must assume that each data point is **independent** of one another. However, this is not the case in the dataset I was working with. Take a look at the sample below. Here are some of the league leaders in receptions for 2023. We can see clearly that we are dealing with some repeated measurements.
+
+```{r}
+ma_wr %>%
+  filter(season == 2023) %>%
+  group_by(player_id) %>%
+  mutate(season_catches = sum(receptions)) %>%# %>%
+  ungroup() %>%
+  arrange(desc(season_catches)) %>%
+  top_n(170) %>%
+  ggplot(aes(x = week, y = fantasy_points)) + 
+  geom_point() + 
+  geom_line() +
+  facet_wrap(~ player_name) 
+    
+  
+  
+  
+  filter(season == 2023, player_id == '00-0036261') %>%
+  select(player_name,week,targets,wt_targets, receptions,wt_receptions, receiving_yards,wt_receiving_yards)
+```
+
+We can see here, that there are several records of Aiyuk in 2023 (even more if we include other seasons). This is an example of what scientists may call "repeated" measures. It's a phrase to describe the process of taking several measurements of a variable on the same subject (Aiyuk). This happens for almost every receiver in our dataset.
+
+
+
+```{r}
+exp_recipe = train_data  %>%
+  recipe() %>%
+  update_role(c(player_id,recent_team,fantasy_points,fantasy_points_ppr,fantasy_points_target),new_role = 'ID') %>%
+  # Generally not recommended to throw out all data, but for brevity, let's remove NAs
+  step_impute_median(all_numeric_predictors()) %>%
+ # Remove zero variance predictors (ie. variables that contribute nothing to prediction)
+  step_zv(all_predictors()) %>%
+  step_center(all_numeric_predictors())
+```
+
+
+
+```{r}
+library(lme4)
+library(multilevelmod)
+
+
+mixed_mod_spec <- linear_reg() %>%
+  set_engine("lmer")
+
+# Setup workflow
+glm_wflow <- workflow() %>% 
+  add_recipe(exp_recipe) %>%
+  add_model(mixed_mod_spec) %>%
+  fit(wt_fantasy_pts ~ 1 + (1|player_id))
+
+# Create cross validation splits
+wr_folds <- vfold_cv(train_data, v = 5)
+
+# Tune the hyperparameters using a grid of values
+glm_tune_results <- tune_grid(
+  glm_wflow,
+  resamples = wr_folds,
+  grid = 10   # Number of tuning combinations to evaluate
+)
+```
+
