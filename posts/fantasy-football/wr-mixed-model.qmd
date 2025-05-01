@@ -30,13 +30,28 @@ We can see here, that there are several records of Aiyuk in 2023 (even more if w
 
 ```{r}
 exp_recipe = train_data %>%
-  recipe(formula = log_fantasy_points ~ .) %>%
-  update_role(c(recent_team,fantasy_points,fantasy_points_ppr,fantasy_points_target),new_role = 'ID') %>%
+  recipe(formula = fantasy_points ~ .) %>%
+  update_role(c(recent_team,log_fantasy_points,fantasy_points_ppr,fantasy_points_target),new_role = 'ID') %>%
   # Generally not recommended to throw out all data, but for brevity, let's remove NAs
   step_impute_median(all_numeric_predictors()) %>%
  # Remove zero variance predictors (ie. variables that contribute nothing to prediction)
   step_zv(all_predictors()) %>%
   step_center(all_numeric_predictors()) 
+
+
+```
+
+```{r}
+# Calculate the correlation matrix wrt to log fantasy points
+cor_matrix <- train_data %>% 
+    select(starts_with("wt_"), fantasy_points) %>%
+    cor(use = "complete.obs")
+
+cor_data <- reshape2::melt(cor_matrix)
+
+# Sort variables by correlation value
+cor_data %>% filter(Var1 == "fantasy_points") %>% select(-Var1) %>% arrange(desc(value))
+
 ```
 
 ```{r}
@@ -49,10 +64,36 @@ mixed_mod_spec <- linear_reg() %>%
 
 # Setup workflow
 glm_wflow <- workflow() %>% 
-  add_recipe(exp_recipe) %>%
-  add_model(spec = mixed_mod_spec, formula = log_fantasy_points ~ 1 + (1|player_id))
+  add_recipe(exp_recipe) #%>%
+  #add_model(spec = mixed_mod_spec, formula = fantasy_points ~ 1 + (1+ wt_wopr|player_id) + wt_wopr)
 
-fit(glm_wflow,data = train_data)
+# Intercept Only
+glm_wflow %>%
+  add_model(spec = mixed_mod_spec, formula = fantasy_points ~ 1 + (1|player_id)) %>%
+  fit(data = train_data) %>%
+  extract_fit_engine() -> int_only
+
+print('Intercept ONly')
+summary(int_only)
+
+# Mixed Effects
+glm_wflow %>%
+  add_model(spec = mixed_mod_spec, formula = fantasy_points ~ 1 + (1|player_id) + wt_wopr + wt_depth_team) %>%
+  fit(data = train_data) %>%
+  extract_fit_engine() -> mixed_mod
+
+print('Mixed Effect')
+summary(mixed_mod)
+
+# Fit 2
+glm_wflow %>%
+  add_model(spec = mixed_mod_spec, formula = fantasy_points ~ 1 + (1+wt_wopr|player_id) + wt_wopr) %>%
+  fit(data = train_data) %>%
+  extract_fit_engine()-> ranef_mod
+  
+print("Random Effect")
+summary(ranef_mod)
+  
 # Create cross validation splits
 #wr_folds <- vfold_cv(train_data, v = 5)
 ```
