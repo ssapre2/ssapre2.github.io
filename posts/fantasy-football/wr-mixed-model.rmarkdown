@@ -8,7 +8,9 @@ categories: [code, analysis,tidymodels,nfl]
 editor: visual
 ---
 
+
 I made a slight mistake. I broke a core assumption of linear regression in the previous edition of the model. To use linear regression, one must assume that each data point is **independent** of one another. However, this is not the case in the dataset I was working with. Take a look at the sample below. Here are some of the league leaders in receptions for 2023. We can see clearly that we are dealing with some repeated measurements.
+
 
 ```{r message=FALSE, warning=FALSE}
 #| include: false
@@ -118,6 +120,7 @@ ma_wr %>%
 
 ```
 
+
 Several records exist for each receiver depicted in the plot. This is an example of what scientists call "repeated" measures. It's a way to describe the process of taking several measurements of a variable on the same subject. This is important because it acknowledges that a core assumption of linear regression is violated (independence) since samples taken or observed from the same subject may not be independent.
 
 In football terms, we want our model to know WHO or WHERE the data is coming from. We want it to know that the data produced by Tyreek Hill is coming from... well... Tyreek Hill. It can be beneficial in this context because it allows us to capture information from our data that may not necessarily be represented by our features (i.e. targets, TDs, yards, etc.)
@@ -125,6 +128,7 @@ In football terms, we want our model to know WHO or WHERE the data is coming fro
 Let's take the following example scenario: Dolphins starting QB Tua Tagovailoa has been injured for the past few games, but he is back this week. Hill's stats haven't been great with the backup in, but he's STILL Tyreek Hill. While the basic linear model will just be going off recent week stats, it's not aware that it's \[TYREEK FREAKING HILL\](<https://www.youtube.com/watch?v=iPHAUaTlH4w>). Acknowledging where the observations come from does that, to an extent.
 
 Now, I'm sure there are probably many nesting structures in the data we're using. When predicting NFL receiving fantasy points, we can probably nest observations within season, week, team, and/or player. For this exercise, we'll focus on using player (player_id in the dataset) as the nesting/grouping variable for interpretability. With player_id as our nesting/grouping variable, let's try to implement this with some familiar code.
+
 
 ```{r}
 # Build a tidymodels recipe object with fantasy points as the target
@@ -157,7 +161,9 @@ cor_data %>%
 
 ```
 
+
 We're going to train a few simple models, without any regularization, to compare a linear model to a mixed model. This time, we'll use the `workflowsets` library from the `tidymodels` family to combine processes for 2 modeling types (mixed effects and linear models).
+
 
 ```{r}
 library(lme4)
@@ -198,7 +204,9 @@ model_set <- as_workflow_set(
 
 ```
 
+
 In the workflow set defined above, we created a simple linear model consisting of the variables *weighted* fantasy points, WOPR, and receptions. I wanted to compare this to the mixed effects model which contained a random intercept that varied by the `player_id`. This is what I mentioned in the section above about taking the player into account in the model.
+
 
 ```{r}
 # Cross Validate across workflow sets
@@ -216,6 +224,7 @@ collect_metrics(cv_results, summarize = TRUE) %>%
 
 ```
 
+
 After running the model, the simple linear model actually outperforms the random intercept model according to RMSE. This is not what I expected. Perhaps the nesting structure is incorrect, observations are more independent than they seem, or I have not implemented the mixed model framework correctly. Any way you slice it, we have only really scratched the surface of mixed effect regression models. You can go down a rabbit hole of the random effects (including random coefficiets).
 
 Hat tip to Patrick Ward for the [inspiration](https://optimumsportsperformance.com/blog/mixed-models-in-sport-science-frequentist-bayesian). Go check out his blog for more Mixed Model content!
@@ -225,3 +234,4 @@ Ho T, Carl S (2024). nflreadr: Download 'nflverse' Data. R package version 1.4.1
 Kuhn et al., (2020). Tidymodels: a collection of packages for modeling and machine learning using tidyverse principles. https://www.tidymodels.org
 
 Patrick. (2022, July 11). Mixed Models in Sport Science – Frequentist & Bayesian \| Patrick Ward, PhD. Retrieved May 3, 2025, from Optimumsportsperformance.com website: https://optimumsportsperformance.com/blog/mixed-models-in-sport-science-frequentist-bayesian/
+
