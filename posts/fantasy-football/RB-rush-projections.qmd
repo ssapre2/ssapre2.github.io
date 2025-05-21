@@ -1,0 +1,63 @@
+---
+title: "Running Back in Style"
+format: html
+---
+
+Running Backs had their moment this past season. A recently maligned position group thought to provide little value to team production made a momentary sigh of relief. Leading the comeback story was Saquon Barkley's near record breaking campaign and Super Bowl run after being dicarded by his former team and now division rival New York Giants. His monumental impact to the Eagles Super Bowl season did not go unnoticed as he was rewarded with a big [contract extention](https://www.espn.com/nfl/story/_/id/44124382/nfl-free-agency-2025-saquon-barkley-change-running-back-contracts-eagles) in March. He wasn't the only one rewarded with a new deal as Derrick Henry received a 2 year extentions following his recent debut season with the Ravens. Those players however aren't anomalies, as some exciting and dynamic stars such as Detroit's Jamyhr Gibbs and Atlanta's Bijan Robinson have both added to the strong case of the position group's value revival. It seems to have also convinced teams this season to invest more in the short dip in the RB market. 
+
+In this year's draft, 5 RBs were selected in the top 60 picks, 1 of which (Ashton Jeanty) was selected number 6. All of this leads me to believe that RB value is on the upswing. 
+
+
+For the past few years, the analytics has discussed at length, the value of each position driven by a desire to optimize where teams spend their resources (draft picks, money, etc.). The prevailing argument coming out of this research was that teams can be successful without investing heavily in position due to a variety of factors including teams adopting pass-heavy approaches, importance of offensive line play and impact, backfield by committee, and the contract values of running backs.
+
+I'm hoping to address the last 2 points in this post. The decline of a "workhorse" back and the increase in rush duties shared among multiple runnings and, at times, the QB. Teams have tended to rely slightly less on one RB for a number of reasons. One of the prime reasons was the hesitancy to put the that kind of load on the bodies of one player. Football is a violent game and taking hits has a toll. A recent run of talented RBs declining after signing massive contracts is a reason teams have been scared off of committing large amounts of resources recently. Players like Todd Gurley, Ezekiel Elliot, and Le'Veon Bell have all experienced precipotous decline and/or serious injuries after signing large long-term contracts.
+
+While it's certainly proven riskier to spend resources on runnings there still have been plenty of RBs who have continued to produce. Henry himself had a stellar season at age 30. Alvin Kamara, Christian, McCafferey, Josh Jacobs, and Barkley have all produced well after receiving long-term contracts. How can we predict whether the contract is worth it? Is there a way to tell how much proverbial gas is left in the tank for these guys. Let's find out...
+
+
+```{r}
+library(nflreadr)
+
+rush_stats = load_player_stats(seasons = seq(2006,2023))
+player_rosters = load_rosters(seasons = seq(2006,2023))
+
+rush_stats |> 
+  filter(position == 'RB') |> 
+  select(c(player_id,player_name,recent_team,season,carries,rushing_yards,targets,receptions))
+
+
+player_rosters |> 
+  filter(position == 'RB') |> 
+  arrange(season,week) |> 
+  group_by(season,gsis_id,position,birth_date,entry_year,college) |> 
+  summarise(full_name = last(full_name),
+            week = last(week),
+            team = last(team),
+            years_exp = last(years_exp)) |> 
+  ungroup() |> 
+  mutate(approx_age = lubridate::time_length(as.Date(paste(season,'03','01',sep = '-'))-birth_date,unit = 'years')) |> 
+  arrange(desc(season))
+```
+
+
+
+
+```{r}
+# Advanced Stats
+load_pfr_advstats(
+  seasons = seq(2018,2023),
+  stat_type = "rush",
+  summary_level = "season",
+  file_type = getOption("nflreadr.prefer", default = "rds")
+)
+```
+
+
+
+
+Links:
+https://opensourcefootball.com/posts/2020-08-25-open-source-fantasy-football-visualizing-trap-backs/
+
+https://www.unexpectedpoints.com/p/what-analytical-draft-value-curves
+
+https://opensourcefootball.com/posts/2023-02-23-nfl-draft-value-chart/
