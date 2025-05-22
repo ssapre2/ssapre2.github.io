@@ -138,7 +138,20 @@ roster_contract |>
 ```
 
 
+```{r}
+agg_stats |> 
+  left_join(y = roster_contract,by = c("season","player_id" = "gsis_id")) |> 
+  filter(season >= 2009) |> 
+  arrange(desc(season))-> model_data
 
+```
+
+```{r}
+# impute
+lm(apy_cap_pct ~ fantasy_points_wt_sum + draft_number + years_exp + games_career_sum+approx_age+season_lag1+fantasy_points_lag1, data = model_data)-> impute_cap_pct
+
+summary(impute_cap_pct)
+```
 
 
 
