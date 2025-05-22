@@ -16,28 +16,128 @@ While it's certainly proven riskier to spend resources on runnings there still h
 
 
 ```{r}
+# Create Time Weighting 
+
+weighted_sum = function(x,alpha=0.8){
+  
+  # Take in sliding window of vector of chosen metric
+
+  n <- length(x)
+  w_sum = sapply(1:n, function(i) {
+    weights <- alpha^((i - 1):0)  # Most recent gets highest weight (alpha^0 = 1)
+    values <- x[1:i]
+    weighted_sum <- sum(values * weights, na.rm = FALSE) / sum(weights)
+    return(weighted_sum)
+  })
+  
+  return(w_sum)
+  
+}
+```
+
+
+```{r}
 library(nflreadr)
 
-rush_stats = load_player_stats(seasons = seq(2006,2023))
+player_stats = load_player_stats(seasons = seq(2006,2023),stat_type = "offense")
 player_rosters = load_rosters(seasons = seq(2006,2023))
 
+stat_cols = c('carries','rushing_yards','targets','receptions','receiving_yards',"fantasy_points","games")
+player_stats |> 
+  filter(position == 'RB') |>
+  arrange(desc(season),desc(week)) |>
+  group_by(player_id,season,) |> 
+  summarise(games = n(),
+            # Team they start season with
+            recent_team = first(recent_team),
+            player_name = last(player_name),
+            across(stat_cols,.fns = sum)) |> 
+  select(c(player_id,player_name,recent_team,season,stat_cols)) -> rush_stats
+
+
+# Calculate cumulative sums of stats endured so far
 rush_stats |> 
-  filter(position == 'RB') |> 
-  select(c(player_id,player_name,recent_team,season,carries,rushing_yards,targets,receptions))
+  group_by(player_id) |> 
+  left_join(rb_injuries,by = c('season','player_id' = 'gsis_id')) |> 
+  replace_na(list(weeks_missed = 0)) |> 
+  # Compute 1 year lag of all numeric columns
+  mutate(across(where(is.numeric), ~lag(.), .names = "{.col}_lag1"),
+         weeks_inj = lag(cumsum(weeks_missed)),
+         across(stat_cols, ~lag(cumsum(.)), .names = "{.col}_career_sum"),
+         across(stat_cols, ~lag(weighted_sum(.)), .names = "{.col}_wt_sum")) -> agg_stats
+  
+```
 
 
+```{r}
+# Injuries
+
+nflreadr::load_injuries(seasons = seq(2009,2023)) -> injuries
+
+injuries |> 
+  filter(position=="RB") |> 
+  group_by(gsis_id,season) |> 
+  summarise(weeks_missed = sum(report_status == "Out",na.rm = T)) |> 
+  ungroup() -> rb_injuries
+
+
+```
+
+
+```{r}
 player_rosters |> 
   filter(position == 'RB') |> 
   arrange(season,week) |> 
-  group_by(season,gsis_id,position,birth_date,entry_year,college) |> 
+  group_by(season,gsis_id,position,birth_date,entry_year,college,draft_club,draft_number) |> 
   summarise(full_name = last(full_name),
             week = last(week),
             team = last(team),
-            years_exp = last(years_exp)) |> 
+            years_exp = last(years_exp),
+            height = last(height),
+            weight = last(weight)) |> 
   ungroup() |> 
-  mutate(approx_age = lubridate::time_length(as.Date(paste(season,'03','01',sep = '-'))-birth_date,unit = 'years')) |> 
-  arrange(desc(season))
+  mutate(
+    approx_age = lubridate::time_length(as.Date(paste(season,'03','01',sep = '-'))-birth_date,unit = 'years'),
+    # Denotes UDFA
+    draft_number = as.numeric(ifelse(
+      is.na(draft_number),263,draft_number
+      
+    ))) |> 
+  arrange(desc(season)) |> 
+  select(gsis_id,season,years_exp,height,weight,approx_age,draft_number)-> rb_roster_info
+
+
+# Contract Info
+nflreadr::load_contracts()-> contracts
+
+contracts |> 
+  # Last 
+  filter(position=='RB') |> 
+  select(year_signed,value, years,gsis_id,apy_cap_pct) |> 
+  distinct() -> rb_contracts
+
+roster_contract = rb_roster_info |> 
+  left_join(rb_contracts,by = c("season" = "year_signed","gsis_id")) |> 
+  arrange(desc(season)) |> 
+  group_by(gsis_id) |> 
+  # Fill contract columns "up" to fill in blanks
+  fill(c(value,years,apy_cap_pct),.direction = 'up')
+
+
 ```
+
+
+
+```{r}
+rb_roster_info |> 
+  filter(gsis_id == '00-0034844')
+
+roster_contract |> 
+  filter(gsis_id == '00-0034844')
+
+```
+
+
 
 
 
