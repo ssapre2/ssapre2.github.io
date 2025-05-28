@@ -38,6 +38,7 @@ weighted_sum = function(x,alpha=0.8){
 
 ```{r}
 library(nflreadr)
+library(tidyverse)
 
 player_stats = load_player_stats(seasons = seq(2006,2023),stat_type = "offense")
 player_rosters = load_rosters(seasons = seq(2006,2023))
@@ -62,6 +63,7 @@ rush_stats |>
   replace_na(list(weeks_missed = 0)) |> 
   # Compute 1 year lag of all numeric columns
   mutate(across(where(is.numeric), ~lag(.), .names = "{.col}_lag1"),
+         # Cumulative sum of injuries
          weeks_inj = lag(cumsum(weeks_missed)),
          across(stat_cols, ~lag(cumsum(.)), .names = "{.col}_career_sum"),
          across(stat_cols, ~lag(weighted_sum(.)), .names = "{.col}_wt_sum")) -> agg_stats
@@ -94,7 +96,8 @@ player_rosters |>
             team = last(team),
             years_exp = last(years_exp),
             height = last(height),
-            weight = last(weight)) |> 
+            weight = last(weight),
+            avg_depth = mean(depth_chart_position)) |> 
   ungroup() |> 
   mutate(
     approx_age = lubridate::time_length(as.Date(paste(season,'03','01',sep = '-'))-birth_date,unit = 'years'),
@@ -113,7 +116,7 @@ nflreadr::load_contracts()-> contracts
 contracts |> 
   # Last 
   filter(position=='RB') |> 
-  select(year_signed,value, years,gsis_id,apy_cap_pct) |> 
+  select(year_signed,value, years,gsis_id,apy,apy_cap_pct) |> 
   distinct() -> rb_contracts
 
 roster_contract = rb_roster_info |> 
@@ -133,10 +136,14 @@ rb_roster_info |>
   filter(gsis_id == '00-0034844')
 
 roster_contract |> 
-  filter(gsis_id == '00-0034844')
+  group_by(age = round(approx_age)) |> 
+  summarise(avg_apy = mean(apy_cap_pct,na.rm = T)) |> 
+  ggplot(aes(x = age,y = avg_apy)) +
+  geom_col() +
+  labs(title = "Peak Cap Space Hit")
 
 ```
-
+Ok, looks like running backs typically take up the largest % of the cap by their age 27 season. This isn't a foolproof plan, as these estimates can be sensitive to small samples, but we're trying to capture year to year changes.
 
 ```{r}
 agg_stats |> 
@@ -146,12 +153,107 @@ agg_stats |>
 
 ```
 
+
+Missingness
+
+Seems as though there are a decent number of missing values for that apy contract value. 
+
+```{r}
+library(naniar)
+library(tidyr)
+
+model_data %>%
+  nabular() %>%
+  ggplot(aes(x = season,
+             y = carries,
+             fill = apy_cap_pct_NA)) + 
+  geom_col()
+
+# Draft Number
+model_data %>%
+  nabular() %>%
+  ggplot(aes(x = draft_number,
+             fill = apy_cap_pct_NA)) + 
+  geom_histogram() +
+  facet_wrap(~season)
+
+
+```
+
+
 ```{r}
 # impute
-lm(apy_cap_pct ~ fantasy_points_wt_sum + draft_number + years_exp + games_career_sum+approx_age+season_lag1+fantasy_points_lag1, data = model_data)-> impute_cap_pct
+lm(apy_cap_pct ~ fantasy_points_wt_sum + draft_number + years_exp +
+     games_career_sum+approx_age
+   +season_lag1+fantasy_points_lag1+fantasy_points_wt_sum, data = model_data)-> impute_cap_pct
 
 summary(impute_cap_pct)
 ```
+
+### Aging Curves
+
+
+Using carries as a proxy for success. We run into the following problem as explained by the graph below.
+
+```{r}
+model_data |> 
+  group_by(age = round(approx_age)) |> 
+  summarise(avg_carries = mean(carries,na.rm = T)) |> 
+  ungroup() |> 
+  ggplot(aes(x = age,y=avg_carries))+
+  geom_smooth()
+```
+Interesting, is it reasonable to expect an upward trajectory the entire way? Perhaps early on in their careers, but I hardly expect them to reach their peak at age 37! This is probably due to a cognitive bias called *survivorship bias*. It's when our sample mistakenly represents only the "success" of population rather than the entire population.
+
+
+```{r}
+
+model_data |> 
+  arrange(player_id,approx_age) |> 
+  group_by(player_id) |> 
+  mutate(
+    age = round(approx_age),
+    delta = carries - lag(carries),
+    age_pair = paste(lag(age), age, sep = "-")
+  )%>%
+    filter(!is.na(delta)) %>%
+    ungroup() -> delta_data
+
+aging_curve <- delta_data %>%
+    group_by(age) %>%
+    summarise(
+      avg_delta = mean(delta, na.rm = TRUE),
+      n_observations = n(),
+      se = sd(delta, na.rm = TRUE) / sqrt(n()),
+      .groups = 'drop'
+    ) %>%
+    #filter(n_observations >= 20) %>%
+    mutate(
+      cumulative_change = cumsum(avg_delta)#,
+      # Normalize to age 27 (typical peak)
+      #performance_index = cumulative_change - cumulative_change[age == 27]
+    )
+
+aging_curve
+
+# Plot agining curve
+aging_curve |> 
+  ggplot(aes(x = age,y = abs(avg_delta))) +
+  geom_col()
+
+
+
+```
+
+Looks like our biggest jump is around age-27 season. So we'll continue with defining 27 as our career "prime".
+
+
+
+```{r}
+modeld
+```
+
+
 
 
 
