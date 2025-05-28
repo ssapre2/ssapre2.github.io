@@ -43,6 +43,18 @@ library(tidyverse)
 player_stats = load_player_stats(seasons = seq(2006,2023),stat_type = "offense")
 player_rosters = load_rosters(seasons = seq(2006,2023))
 
+
+# Injuries
+
+nflreadr::load_injuries(seasons = seq(2009,2023)) -> injuries
+
+injuries |> 
+  filter(position=="RB") |> 
+  group_by(gsis_id,season) |> 
+  summarise(weeks_missed = sum(report_status == "Out",na.rm = T)) |> 
+  ungroup() -> rb_injuries
+
+# Aggregate and Join
 stat_cols = c('carries','rushing_yards','targets','receptions','receiving_yards',"fantasy_points","games")
 player_stats |> 
   filter(position == 'RB') |>
@@ -71,19 +83,6 @@ rush_stats |>
 ```
 
 
-```{r}
-# Injuries
-
-nflreadr::load_injuries(seasons = seq(2009,2023)) -> injuries
-
-injuries |> 
-  filter(position=="RB") |> 
-  group_by(gsis_id,season) |> 
-  summarise(weeks_missed = sum(report_status == "Out",na.rm = T)) |> 
-  ungroup() -> rb_injuries
-
-
-```
 
 
 ```{r}
@@ -100,14 +99,14 @@ player_rosters |>
             avg_depth = mean(depth_chart_position)) |> 
   ungroup() |> 
   mutate(
-    approx_age = lubridate::time_length(as.Date(paste(season,'03','01',sep = '-'))-birth_date,unit = 'years'),
+    age = round(lubridate::time_length(as.Date(paste(season,'03','01',sep = '-'))-birth_date,unit = 'years')),
     # Denotes UDFA
     draft_number = as.numeric(ifelse(
       is.na(draft_number),263,draft_number
       
     ))) |> 
   arrange(desc(season)) |> 
-  select(gsis_id,season,years_exp,height,weight,approx_age,draft_number)-> rb_roster_info
+  select(gsis_id,season,years_exp,height,weight,age,draft_number)-> rb_roster_info
 
 
 # Contract Info
@@ -116,27 +115,33 @@ nflreadr::load_contracts()-> contracts
 contracts |> 
   # Last 
   filter(position=='RB') |> 
-  select(year_signed,value, years,gsis_id,apy,apy_cap_pct) |> 
+  select(year_signed,gsis_id,apy,apy_cap_pct) |> 
+  # Grab max contract value per player per year (Players may sign multiple contracts per year)
+  group_by(gsis_id,year_signed) |> 
+  mutate(apy = max(apy),apy_cap_pct = max(apy_cap_pct)) |> 
   distinct() -> rb_contracts
+
+# Check no one has more than 1 contract per year
+rb_contracts |> 
+  group_by(year_signed,gsis_id) |> 
+  tally() |> 
+  arrange(desc(n))
 
 roster_contract = rb_roster_info |> 
   left_join(rb_contracts,by = c("season" = "year_signed","gsis_id")) |> 
   arrange(desc(season)) |> 
   group_by(gsis_id) |> 
   # Fill contract columns "up" to fill in blanks
-  fill(c(value,years,apy_cap_pct),.direction = 'up')
+  fill(c(apy_cap_pct),.direction = 'up')
 
 
 ```
 
 
-
 ```{r}
-rb_roster_info |> 
-  filter(gsis_id == '00-0034844')
 
 roster_contract |> 
-  group_by(age = round(approx_age)) |> 
+  group_by(age) |> 
   summarise(avg_apy = mean(apy_cap_pct,na.rm = T)) |> 
   ggplot(aes(x = age,y = avg_apy)) +
   geom_col() +
@@ -152,6 +157,76 @@ agg_stats |>
   arrange(desc(season))-> model_data
 
 ```
+
+
+### Data Splitting
+
+Before we start with any analysis, we should start with our preprocessing steps so we're not leaking any information to a model.
+
+```{r}
+library(tidymodels)
+# Split the data
+splits <- rsample::initial_split(model_data, prop = 0.8, strata = age)
+rb_train <- rsample::training(splits)
+rb_test <- rsample::testing(splits)
+```
+
+
+## Imputation
+
+As you saw, I took the lag value of several variables making our initial projections (rookie year) unpredictable at this point. However, I think we can reasonably predict how many carries a rookie may receive in his rookie year given a simple formula.
+
+```{r}
+rb_train |>
+  filter(years_exp == 0) -> rookie_train
+
+rookie_fit <- lm(carries ~ season + draft_number, data = rookie_train)
+
+broom::glance(rookie_fit)
+
+tidy(rookie_fit, conf.int = TRUE)
+```
+
+
+
+```{r}
+# Create cross-validation folds
+rb_folds <- vfold_cv(rb_train, v = 5, strata = age)
+
+# Define preprocessing recipes
+# Recipe 1: Basic preprocessing
+basic_recipe <- recipe(carries ~ ., data = rb_train) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_corr(all_numeric_predictors(), threshold = 0.9)
+
+# Recipe 2: More complex preprocessing with polynomial terms
+poly_recipe <- recipe(mpg ~ ., data = rb_train) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_poly(hp, wt, degree = 2) %>%
+  step_corr(all_numeric_predictors(), threshold = 0.9)
+
+# Recipe 3: PCA preprocessing
+pca_recipe <- recipe(mpg ~ ., data = rb_train) %>%
+  step_normalize(all_numeric_predictors()) %>%
+  step_pca(all_numeric_predictors(), threshold = 0.95)
+
+# Define model specifications
+# Linear regression
+lm_spec <- linear_reg() %>%
+  set_engine("lm")
+
+# Random Forest
+rf_spec <- rand_forest(
+  mtry = tune(),
+  trees = 1000,
+  min_n = tune()
+) %>%
+  set_engine("ranger") %>%
+  set_mode("regression")
+
+```
+
+
 
 
 Missingness
