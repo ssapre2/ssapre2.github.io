@@ -317,7 +317,7 @@ best_workflow_id <- model_rankings |>
 model_rankings
 ```
 
-This autoplot gives us some added context to our tested model performance. While it looks like the tree-based models give us slightly better fit than the linear regressions. It's doesn't seem like their performance is better enough to justify the increased complexity and training time required. We'll therefore stick with the regularized regression models.
+This autoplot gives us some added context to our tested model performance. While it looks like the tree-based models give us slightly better fit than the glms. It can be argued that the performance improvement of the random forest model doesn't justify the increased complexity and training time required. However, implementing that RF forest shouldn't be too difficult in practice. We'll stick with that.
 
 
 ```{r}
@@ -371,31 +371,6 @@ library('bundle')
 bundled_mod <-  bundle(final_workflow)
 saveRDS(bundled_mod,file = "rb_carry_ml_wflow")
 ```
-
-
-```{r}
-# Load the workflow
-loaded_wflow <- readRDS("rb_carry_ml_wflow.rds")
-```
-
-
-Bootstrapping
-
-```{r}
-boot_resamples <- bootstraps(rb_train, times = 10)
-
-# Fit the model to each bootstrap sample and predict on new data
-boot_predictions <- boot_resamples %>%
-  mutate(
-    models = map(splits, ~ fit(final_workflow, analysis(.x))),
-    predictions = map(models, ~ predict(.x, new_data = rb_test))
-  ) %>%
-  unnest(predictions)
-
-predict(extract_wflow, rb_test, type = "pred_int", level = 0.95)
-
-```
-
 
 
 ```{r}
