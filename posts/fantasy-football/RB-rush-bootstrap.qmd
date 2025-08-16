@@ -1,0 +1,5 @@
+---
+title: "Putting Our Model in Practice w/ Bootstrapping"
+author: "Sameer Sapre"
+editor: visual
+---

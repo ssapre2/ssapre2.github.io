@@ -3,7 +3,7 @@ title: "Running Back in Style"
 format: html
 ---
 
-Running Backs had their moment this past season. A recently maligned position group thought to provide little value to team production made a momentary sigh of relief. Leading the comeback story was Saquon Barkley's near record breaking campaign and Super Bowl run after being dicarded by his former team and now division rival New York Giants. His monumental impact to the Eagles Super Bowl season did not go unnoticed as he was rewarded with a big [contract extention](https://www.espn.com/nfl/story/_/id/44124382/nfl-free-agency-2025-saquon-barkley-change-running-back-contracts-eagles) in March. He wasn't the only one rewarded with a new deal as Derrick Henry received a 2 year extentions following his recent debut season with the Ravens. Those players however aren't anomalies, as some exciting and dynamic stars such as Detroit's Jamyhr Gibbs and Atlanta's Bijan Robinson have both added to the strong case of the position group's value revival. It seems to have also convinced teams this season to invest more in the short dip in the RB market. 
+Running Backs had their moment this past season. A recently maligned position group thought to provide little value to team production made a momentary sigh of relief. Leading the comeback story was Saquon Barkley's near record breaking campaign and Super Bowl run after being discarded by his former team and now division rival New York Giants. His monumental impact to the Eagles Super Bowl season did not go unnoticed as he was rewarded with a big [contract extention](https://www.espn.com/nfl/story/_/id/44124382/nfl-free-agency-2025-saquon-barkley-change-running-back-contracts-eagles) in March. He wasn't the only one rewarded with a new deal as Derrick Henry received a 2 year extentions following his recent debut season with the Ravens. Those players however aren't anomalies, as some exciting and dynamic stars such as Detroit's Jamyhr Gibbs and Atlanta's Bijan Robinson have both added to the strong case of the position group's value revival. It seems to have also convinced teams this season to invest more in the short dip in the RB market. 
 
 In this year's draft, 5 RBs were selected in the top 60 picks, 1 of which (Ashton Jeanty) was selected number 6. All of this leads me to believe that RB value is on the upswing. 
 
@@ -36,17 +36,19 @@ weighted_sum = function(x,alpha=0.8){
 ```
 
 
+We'll load our relevnat data in this section. Hypothesizing which types of stats could be the biggest influencers of running back carries, we'll break things down into previous success, injuries, and monetary commitment.
+
 ```{r}
 library(nflreadr)
 library(tidyverse)
 
-player_stats = load_player_stats(seasons = seq(2006,2023),stat_type = "offense")
-player_rosters = load_rosters(seasons = seq(2006,2023))
+player_stats = load_player_stats(seasons = seq(2006,most_recent_season()),stat_type = "offense")
+player_rosters = load_rosters(seasons = seq(2006,most_recent_season()))
 
 
 # Injuries
 
-nflreadr::load_injuries(seasons = seq(2009,2023)) -> injuries
+nflreadr::load_injuries(seasons = seq(2009,most_recent_season())) -> injuries
 
 injuries |> 
   filter(position=="RB") |> 
@@ -83,12 +85,15 @@ rush_stats |>
 ```
 
 
-
+#### Depth Charts 
 
 ```{r}
 player_rosters |> 
   filter(position == 'RB') |> 
   arrange(season,week) |> 
+  group_by(gsis_id) |> 
+  # Some NAs for draft number
+  mutate(draft_number = min(draft_number,na.rm = T)) |> 
   group_by(season,gsis_id,position,birth_date,entry_year,college,draft_club,draft_number) |> 
   summarise(full_name = last(full_name),
             week = last(week),
@@ -100,7 +105,7 @@ player_rosters |>
   ungroup() |> 
   mutate(
     age = round(lubridate::time_length(as.Date(paste(season,'03','01',sep = '-'))-birth_date,unit = 'years')),
-    # Denotes UDFA
+    # Handles UDFA
     draft_number = as.numeric(ifelse(
       is.na(draft_number),263,draft_number
       
@@ -108,7 +113,14 @@ player_rosters |>
   arrange(desc(season)) |> 
   select(gsis_id,season,years_exp,height,weight,age,draft_number)-> rb_roster_info
 
+rb_roster_info |> 
+  filter(gsis_id == "00-0032780")
+```
 
+
+#### Contract Info
+
+```{r}
 # Contract Info
 nflreadr::load_contracts()-> contracts
 
@@ -138,6 +150,8 @@ roster_contract = rb_roster_info |>
 ```
 
 
+Let's take a look at the salary cap space devoted to RBs by age.
+
 ```{r}
 
 roster_contract |> 
@@ -154,7 +168,13 @@ Ok, looks like running backs typically take up the largest % of the cap by their
 agg_stats |> 
   left_join(y = roster_contract,by = c("season","player_id" = "gsis_id")) |> 
   filter(season >= 2009) |> 
-  arrange(desc(season))-> model_data
+  # Create a new target: "Total Touches"
+  mutate(touches = carries + receptions) |> 
+  arrange(desc(season)) |> 
+  # Select relevant columns for modeling
+  select(1:4,ends_with("_sum"),ends_with("_lag1"),"touches",36:44,-c(apy))-> model_data
+
+# Select base
 
 ```
 
@@ -165,27 +185,352 @@ Before we start with any analysis, we should start with our preprocessing steps 
 
 ```{r}
 library(tidymodels)
+set.seed(123)
 # Split the data
-splits <- rsample::initial_split(model_data, prop = 0.8, strata = age)
+splits <- rsample::initial_split(model_data, prop = 0.8)
 rb_train <- rsample::training(splits)
 rb_test <- rsample::testing(splits)
 ```
 
 
-## Imputation
+Create recipes (eventually we will compare).
 
-As you saw, I took the lag value of several variables making our initial projections (rookie year) unpredictable at this point. However, I think we can reasonably predict how many carries a rookie may receive in his rookie year given a simple formula.
+```{r}
+# Create cross-validation folds
+rb_folds <- vfold_cv(rb_train, v = 5)
+
+some_vars <- names(model_data)[5:ncol(model_data)]
+
+# Define preprocessing recipes
+# Recipe 1: Basic preprocessing
+basic_recipe <- recipe(touches ~ ., data = rb_train) |> 
+  update_role(season, new_role = "ID") |> 
+  update_role(player_id, new_role = "ID") |> 
+  step_select(all_of(some_vars)) |> 
+  step_normalize(all_numeric_predictors()) |> 
+  step_corr(all_numeric_predictors(), threshold = 0.9) |> 
+  step_impute_median(apy_cap_pct) |> 
+  step_naomit(all_numeric_predictors()) |> 
+  step_filter_missing(
+    threshold = 0.3
+  ) 
+  
+
+pca_recipe <- basic_recipe |> 
+    step_pca(all_numeric_predictors(), threshold = 0.95)
+
+
+# Define model specifications
+# Linear regression
+lm_spec <- linear_reg() |>
+  set_engine("lm")
+  
+
+# Random Forest
+rf_spec <- rand_forest(
+  mtry = tune(),
+  trees = 1000,
+  min_n = tune()
+) |>
+  set_engine("ranger") |>
+  set_mode("regression")
+
+# Elastic Net
+glm_spec <- linear_reg(
+  penalty = tune(),
+  mixture = tune()
+) |>
+  set_engine("glmnet")
+
+# XGBoost
+xgb_spec <- boost_tree(
+  mtry = tune(), trees = 1000, min_n = tune(), tree_depth = tune(),
+  learn_rate = tune(), loss_reduction = tune(), sample_size = NULL,
+  stop_iter = tune()
+) |>
+  set_engine("xgboost") |>
+  set_mode("regression")
+
+prep(basic_recipe)
+
+```
+
+
+```{r}
+# Create workflow set
+# Combine different recipes with different models
+model_set <- workflow_set(
+  preproc = list(
+    basic = basic_recipe,
+    pca = pca_recipe
+  ),
+  models = list(
+    lm = lm_spec,
+    rf = rf_spec,
+    glm = glm_spec,
+    xgb = xgb_spec
+    ),
+  cross = TRUE  # Create all combinations
+)
+
+# View the workflow set
+print(model_set)
+```
+
+
+```{r}
+#doParallel::registerDoParallel()
+
+model_results <- model_set |>
+  workflow_map(
+    fn = "tune_grid",
+    resamples = rb_folds,
+    grid = 10,  # Number of hyperparameter combinations to try
+    metrics = metric_set(rmse, rsq, mae),
+    verbose = TRUE,
+    seed = 123
+  )
+
+# View results summary
+# Collect and rank metrics
+model_rankings <- model_results |>
+  rank_results(rank_metric = "rmse", select_best = TRUE) |>
+  filter(.metric == "rmse")
+
+print(model_rankings)
+```
+
+Okay, it looks like the random forrest regressor was the best at predicting new samples. It also appears that our PCA did not do a great job of minimizing enough of the information in the feature space.
+
+```{r}
+# Visualize model performance
+autoplot(model_results, metric = "rmse") +
+  theme_minimal() +
+  labs(title = "Model Performance Comparison",
+       subtitle = "Lower RMSE indicates better performance") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+best_workflow_id <- model_rankings |> 
+  slice_head(n = 1) |> 
+  pull(wflow_id)
+
+model_rankings
+```
+
+This autoplot gives us some added context to our tested model performance. While it looks like the tree-based models give us slightly better fit than the linear regressions. It's doesn't seem like their performance is better enough to justify the increased complexity and training time required. We'll therefore stick with the regularized regression models.
+
+
+```{r}
+best_workflow <- model_results |> 
+  extract_workflow(best_workflow_id)
+
+# Finalize the best model with optimal hyperparameters  
+best_results <- model_results |> 
+  extract_workflow_set_result(best_workflow_id)
+ 
+best_params <- best_results |> 
+  select_best(metric = "rmse")
+
+final_workflow <- best_workflow |> 
+  finalize_workflow(best_params)
+
+# Fit the final model on training data and evaluate on test data
+final_fit <- final_workflow |> 
+  last_fit(splits)
+
+final_workflow
+```
+
+
+Let's see how well our model approximates the number of "touches" a ball carrier is expected to take.
+
+```{r}
+# Test set performance
+test_performance <- final_fit |>
+  collect_metrics()
+
+print("Test Set Performance:")
+print(test_performance)
+
+# Predictions vs actual plot
+final_fit |>
+  collect_predictions() |>
+  ggplot(aes(x = touches, y = .pred)) +
+  geom_point(alpha = 0.7) +
+  geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed") +
+  labs(x = "Actual Touches", y = "Predicted Touches",
+       title = "Best Model: Predictions vs Actual") +
+  theme_minimal()
+```
+
+Sweet! Now that we have our model selected and finalized, let's save it for future use using the `bundle` package.
+
+```{r}
+library('bundle')
+
+bundled_mod <-  bundle(final_workflow)
+saveRDS(bundled_mod,file = "rb_carry_ml_wflow")
+```
+
+
+```{r}
+# Load the workflow
+loaded_wflow <- readRDS("rb_carry_ml_wflow.rds")
+```
+
+
+Bootstrapping
+
+```{r}
+boot_resamples <- bootstraps(rb_train, times = 10)
+
+# Fit the model to each bootstrap sample and predict on new data
+boot_predictions <- boot_resamples %>%
+  mutate(
+    models = map(splits, ~ fit(final_workflow, analysis(.x))),
+    predictions = map(models, ~ predict(.x, new_data = rb_test))
+  ) %>%
+  unnest(predictions)
+
+predict(extract_wflow, rb_test, type = "pred_int", level = 0.95)
+
+```
+
+
+
+```{r}
+# Create a detailed comparison plot
+model_results |>
+  collect_metrics() |>
+  filter(.metric == "rmse") |>
+  ggplot(aes(x = reorder(wflow_id, mean), y = mean)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = mean - std_err, ymax = mean + std_err), 
+                width = 0.1) +
+  coord_flip() +
+  labs(x = "Workflow", y = "RMSE",
+       title = "Model Performance Comparison with Error Bars") +
+  theme_minimal()
+
+```
+
+
+
+### Imputation
+
+As you saw, I took the lag value of several variables meaning that we cannot make predictions for running backs with 0 years of experience, aka rookies. However, I for one would love to see how many carries Ashton Jeanty may reasonably take this year and it should be simple enough to at least TRY to estimate that.
 
 ```{r}
 rb_train |>
   filter(years_exp == 0) -> rookie_train
 
-rookie_fit <- lm(carries ~ season + draft_number, data = rookie_train)
+rb_train |> 
+  filter(years_exp == 0)  -> rookie_test
+rookie_train |> 
+  ggplot(aes(x = draft_number, y= carries+targets)) +
+  geom_point() + 
+  geom_smooth(method = "gam")
+```
+
+
+```{r}
+# Recipe 1: Rookies
+rookie_recipe <- recipe(touches ~ ., data = rookie_train) |> 
+  step_normalize(all_numeric_predictors()) |>
+  step_corr(all_numeric_predictors(), threshold = 0.9)
+```
+
+
+
+Okay, not exactly linear by any means, but in-line with our intuition that lower draft picks will get more touches on the ball.
+
+
+
+```{r}
+library(mgcv)
+
+
+rookie_fit <- lm(carries ~ season + draft_number + height*weight, data = rookie_train)
+
+# Fit a GAM with 1 predictor x and response y
+gam_model <- gam(carries ~ s(draft_number) + s(weight) + height + season, data = rookie_train)
+
+gam_model2<- gam(carries ~ s(draft_number) + te(weight, height) + weight,data = rookie_train)
 
 broom::glance(rookie_fit)
 
-tidy(rookie_fit, conf.int = TRUE)
+broom::glance(gam_model)
+
+summary(gam_model)
+
+summary(gam_model2)
+
+tidy(gam_model, conf.int = TRUE)
+
+# Make predictions on test set
+augment(gam_model,rookie_test) |> 
+  select(player_id,player_name,recent_team, season,carries,.fitted,.resid,draft_number,height,weight) -> res_rookie
+
+res_rookie |> 
+  arrange(desc(season),desc(.resid))
+
+# SSE
+sqrt(mean((res_rookie$.fitted-res_rookie$carries)**2))
+rmse(res_rookie, carries,.fitted)
+
+
+res_rookie |> 
+  ggplot(aes(x = draft_number, y = abs(.resid))) +
+  geom_point()+
+  geom_smooth(method = "lm")
 ```
+
+
+
+One of the cools features of the GAM application, is the allowance of both linear and non-linear terms. In the output above, we can assume a linear relationship betweens between height and carries and season and carries.
+
+Scatter Plot Matrices
+
+```{r}
+#| message: false
+#| warning: false
+library(GGally)
+better_smooth <- function(data, mapping, ptcol, ptalpha=1, ptsize=1, linecol, ...) {
+  p <- ggplot(data = data, mapping = mapping) +
+    geom_point(color=ptcol, alpha=ptalpha, size=ptsize) +
+    geom_smooth(color=linecol, ...)
+  p
+}
+
+p = GGally::ggpairs(
+  rookie_train[, c(5, 38:41)],
+  lower = list(
+    continuous = GGally::wrap(
+      better_smooth,
+      ptalpha = .25,
+      ptcol = '#D55E00',
+      ptsize = 1,
+      linecol = '#03b3ff',
+      method = 'loess',
+      se = F,
+      lwd = .5
+    )
+  ),
+  diag = list(continuous = GGally::wrap(
+    'densityDiag', color = 'gray50', lwd = .5
+  )),
+  # upper=list(continuous=GGally::wrap(better_corr)),
+  axisLabels = "none"
+)
+
+p
+```
+
+```{r}
+plot(ggeffects::ggpredict(gam_model))
+gratia::draw(gam_model)
+```
+
 
 
 
@@ -195,24 +540,24 @@ rb_folds <- vfold_cv(rb_train, v = 5, strata = age)
 
 # Define preprocessing recipes
 # Recipe 1: Basic preprocessing
-basic_recipe <- recipe(carries ~ ., data = rb_train) %>%
-  step_normalize(all_numeric_predictors()) %>%
+basic_recipe <- recipe(carries ~ ., data = rb_train) |>
+  step_normalize(all_numeric_predictors()) |>
   step_corr(all_numeric_predictors(), threshold = 0.9)
 
 # Recipe 2: More complex preprocessing with polynomial terms
-poly_recipe <- recipe(mpg ~ ., data = rb_train) %>%
-  step_normalize(all_numeric_predictors()) %>%
-  step_poly(hp, wt, degree = 2) %>%
+poly_recipe <- recipe(mpg ~ ., data = rb_train) |>
+  step_normalize(all_numeric_predictors()) |>
+  step_poly(hp, wt, degree = 2) |>
   step_corr(all_numeric_predictors(), threshold = 0.9)
 
 # Recipe 3: PCA preprocessing
-pca_recipe <- recipe(mpg ~ ., data = rb_train) %>%
-  step_normalize(all_numeric_predictors()) %>%
+pca_recipe <- recipe(mpg ~ ., data = rb_train) |>
+  step_normalize(all_numeric_predictors()) |>
   step_pca(all_numeric_predictors(), threshold = 0.95)
 
 # Define model specifications
 # Linear regression
-lm_spec <- linear_reg() %>%
+lm_spec <- linear_reg() |>
   set_engine("lm")
 
 # Random Forest
@@ -220,8 +565,8 @@ rf_spec <- rand_forest(
   mtry = tune(),
   trees = 1000,
   min_n = tune()
-) %>%
-  set_engine("ranger") %>%
+) |>
+  set_engine("ranger") |>
   set_mode("regression")
 
 ```
@@ -229,7 +574,14 @@ rf_spec <- rand_forest(
 
 
 
-Missingness
+### Missingness
+
+```{r}
+rb_train |> 
+  ungroup() |> 
+  miss_var_summary()
+```
+
 
 Seems as though there are a decent number of missing values for that apy contract value. 
 
@@ -237,19 +589,19 @@ Seems as though there are a decent number of missing values for that apy contrac
 library(naniar)
 library(tidyr)
 
-model_data %>%
-  nabular() %>%
+model_data |>
+  nabular() |>
   ggplot(aes(x = season,
              y = carries,
              fill = apy_cap_pct_NA)) + 
   geom_col()
 
 # Draft Number
-model_data %>%
-  nabular() %>%
+model_data |>
+  nabular() |>
   ggplot(aes(x = draft_number,
-             fill = apy_cap_pct_NA)) + 
-  geom_histogram() +
+             y = apy_cap_pct)) + 
+  geom_miss_point() +
   facet_wrap(~season)
 
 
@@ -258,9 +610,15 @@ model_data %>%
 
 ```{r}
 # impute
-lm(apy_cap_pct ~ fantasy_points_wt_sum + draft_number + years_exp +
-     games_career_sum+approx_age
-   +season_lag1+fantasy_points_lag1+fantasy_points_wt_sum, data = model_data)-> impute_cap_pct
+gam(apy_cap_pct ~ s(fantasy_points_wt_sum) + s(draft_number) + s(years_exp) +
+     te(games_career_sum,age)+
+   +s(season_lag1)+
+     s(fantasy_points_wt_sum)+
+     s(weight)+
+     s(weeks_inj), 
+   data = rb_train,
+   method="REML",
+   select=TRUE)-> impute_cap_pct
 
 summary(impute_cap_pct)
 ```
@@ -290,19 +648,19 @@ model_data |>
     age = round(approx_age),
     delta = carries - lag(carries),
     age_pair = paste(lag(age), age, sep = "-")
-  )%>%
-    filter(!is.na(delta)) %>%
+  )|>
+    filter(!is.na(delta)) |>
     ungroup() -> delta_data
 
-aging_curve <- delta_data %>%
-    group_by(age) %>%
+aging_curve <- delta_data |>
+    group_by(age) |>
     summarise(
       avg_delta = mean(delta, na.rm = TRUE),
       n_observations = n(),
       se = sd(delta, na.rm = TRUE) / sqrt(n()),
       .groups = 'drop'
-    ) %>%
-    #filter(n_observations >= 20) %>%
+    ) |>
+    #filter(n_observations >= 20) |>
     mutate(
       cumulative_change = cumsum(avg_delta)#,
       # Normalize to age 27 (typical peak)
@@ -333,13 +691,7 @@ modeld
 
 
 ```{r}
-# Advanced Stats
-load_pfr_advstats(
-  seasons = seq(2018,2023),
-  stat_type = "rush",
-  summary_level = "season",
-  file_type = getOption("nflreadr.prefer", default = "rds")
-)
+
 ```
 
 
