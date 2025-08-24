@@ -363,15 +363,6 @@ final_fit |>
   theme_minimal()
 ```
 
-Sweet! Now that we have our model selected and finalized, let's save it for future use using the `bundle` package.
-
-```{r}
-library('bundle')
-
-bundled_mod <-  bundle(final_workflow)
-saveRDS(bundled_mod,file = "rb_carry_ml_wflow")
-```
-
 
 ```{r}
 # Create a detailed comparison plot
@@ -388,7 +379,7 @@ model_results |>
   theme_minimal()
 
 ```
-
+While we have our model prepared, we're still missing something we didn't get a chance to address in the last few posts. We typically throw out the first week/year/date (not recommended in practice) since we had no data. Well we still don't, but that want stop us from making educated guesses. 
 
 
 ### Imputation
@@ -402,7 +393,7 @@ rb_train |>
 rb_train |> 
   filter(years_exp == 0)  -> rookie_test
 rookie_train |> 
-  ggplot(aes(x = draft_number, y= carries+targets)) +
+  ggplot(aes(x = draft_number, y= touches)) +
   geom_point() + 
   geom_smooth(method = "gam")
 ```
@@ -417,20 +408,22 @@ rookie_recipe <- recipe(touches ~ ., data = rookie_train) |>
 
 
 
-Okay, not exactly linear by any means, but in-line with our intuition that lower draft picks will get more touches on the ball.
+Okay, not exactly linear by any means, but in-line with our intuition that lower draft picks will get more touches on the ball. You might have noticed that we're using "gam" as the smoothing method. This is to implement a Generalized Additive Model. We won't get into the nitty gritty of what that is in this post, but it's important to know that we use it when we know a relationship between predictor and response in NOT linear.
 
+Below, we'll actually create a GAM model to serve as a our model for rookies.We're going to do the quick and dirty way of building a model without any cross-validation or much preprocessing since that is handled for us.
 
 
 ```{r}
 library(mgcv)
 
+# Fit our baseline model - simple linear regression
+rookie_fit <- lm(touches ~ season + draft_number + height*weight, data = rookie_train)
 
-rookie_fit <- lm(carries ~ season + draft_number + height*weight, data = rookie_train)
+# Fit a GAM with 1 predictor x and response y - This was tinkered with
+gam_model <- gam(touches ~ s(draft_number) + s(weight) + height + season, data = rookie_train)
 
-# Fit a GAM with 1 predictor x and response y
-gam_model <- gam(carries ~ s(draft_number) + s(weight) + height + season, data = rookie_train)
-
-gam_model2<- gam(carries ~ s(draft_number) + te(weight, height) + weight,data = rookie_train)
+# Some more tinkering just cause
+gam_model2<- gam(touches ~ s(draft_number) + te(weight, height) + weight,data = rookie_train)
 
 broom::glance(rookie_fit)
 
@@ -444,14 +437,14 @@ tidy(gam_model, conf.int = TRUE)
 
 # Make predictions on test set
 augment(gam_model,rookie_test) |> 
-  select(player_id,player_name,recent_team, season,carries,.fitted,.resid,draft_number,height,weight) -> res_rookie
+  select(player_id,player_name,recent_team, season,touches,.fitted,.resid,draft_number,height,weight) -> res_rookie
 
 res_rookie |> 
   arrange(desc(season),desc(.resid))
 
 # SSE
-sqrt(mean((res_rookie$.fitted-res_rookie$carries)**2))
-rmse(res_rookie, carries,.fitted)
+sqrt(mean((res_rookie$.fitted-res_rookie$touches)**2))
+rmse(res_rookie, touches,.fitted)
 
 
 res_rookie |> 
@@ -459,47 +452,13 @@ res_rookie |>
   geom_point()+
   geom_smooth(method = "lm")
 ```
+When we say the model was "tinkered with" it just means we were checking significance with different combinations of variables.
 
 
+Now that we've finished the GAM model we can combine both datatsets and check what the results tell us.
 
-One of the cools features of the GAM application, is the allowance of both linear and non-linear terms. In the output above, we can assume a linear relationship betweens between height and carries and season and carries.
+One of the core features of the GAM application, is the allowance of both linear and non-linear terms. In the output above, we can assume a linear relationship betweens between height and touches and season and touches.
 
-Scatter Plot Matrices
-
-```{r}
-#| message: false
-#| warning: false
-library(GGally)
-better_smooth <- function(data, mapping, ptcol, ptalpha=1, ptsize=1, linecol, ...) {
-  p <- ggplot(data = data, mapping = mapping) +
-    geom_point(color=ptcol, alpha=ptalpha, size=ptsize) +
-    geom_smooth(color=linecol, ...)
-  p
-}
-
-p = GGally::ggpairs(
-  rookie_train[, c(5, 38:41)],
-  lower = list(
-    continuous = GGally::wrap(
-      better_smooth,
-      ptalpha = .25,
-      ptcol = '#D55E00',
-      ptsize = 1,
-      linecol = '#03b3ff',
-      method = 'loess',
-      se = F,
-      lwd = .5
-    )
-  ),
-  diag = list(continuous = GGally::wrap(
-    'densityDiag', color = 'gray50', lwd = .5
-  )),
-  # upper=list(continuous=GGally::wrap(better_corr)),
-  axisLabels = "none"
-)
-
-p
-```
 
 ```{r}
 plot(ggeffects::ggpredict(gam_model))
@@ -612,63 +571,6 @@ model_data |>
   geom_smooth()
 ```
 Interesting, is it reasonable to expect an upward trajectory the entire way? Perhaps early on in their careers, but I hardly expect them to reach their peak at age 37! This is probably due to a cognitive bias called *survivorship bias*. It's when our sample mistakenly represents only the "success" of population rather than the entire population.
-
-
-```{r}
-
-model_data |> 
-  arrange(player_id,approx_age) |> 
-  group_by(player_id) |> 
-  mutate(
-    age = round(approx_age),
-    delta = carries - lag(carries),
-    age_pair = paste(lag(age), age, sep = "-")
-  )|>
-    filter(!is.na(delta)) |>
-    ungroup() -> delta_data
-
-aging_curve <- delta_data |>
-    group_by(age) |>
-    summarise(
-      avg_delta = mean(delta, na.rm = TRUE),
-      n_observations = n(),
-      se = sd(delta, na.rm = TRUE) / sqrt(n()),
-      .groups = 'drop'
-    ) |>
-    #filter(n_observations >= 20) |>
-    mutate(
-      cumulative_change = cumsum(avg_delta)#,
-      # Normalize to age 27 (typical peak)
-      #performance_index = cumulative_change - cumulative_change[age == 27]
-    )
-
-aging_curve
-
-# Plot agining curve
-aging_curve |> 
-  ggplot(aes(x = age,y = abs(avg_delta))) +
-  geom_col()
-
-
-
-```
-
-Looks like our biggest jump is around age-27 season. So we'll continue with defining 27 as our career "prime".
-
-
-
-```{r}
-modeld
-```
-
-
-
-
-
-```{r}
-
-```
-
 
 
 
