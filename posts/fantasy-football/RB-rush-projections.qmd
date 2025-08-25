@@ -18,7 +18,7 @@ While it's certainly proven riskier to spend resources on runnings there still h
 ```{r}
 # Create Time Weighting 
 
-weighted_sum = function(x,alpha=0.8){
+weighted_sum = function(x,alpha=1){
   
   # Take in sliding window of vector of chosen metric
 
@@ -32,6 +32,23 @@ weighted_sum = function(x,alpha=0.8){
   
   return(w_sum)
   
+}
+
+# Create Time Weighting 
+
+weighted_avg = function(metric_vector){
+  
+  # Take in sliding window of vector of chosen metric
+  n = length(metric_vector)
+
+  # Create Weights for each value based on recency
+  weights = seq(1,n)
+  
+  # Calculated weighted average
+  w_avg = sum(metric_vector * weights,na.rm = F) / sum(weights)
+  
+  return(w_avg)
+
 }
 ```
 
@@ -70,18 +87,26 @@ player_stats |>
   select(c(player_id,player_name,recent_team,season,stat_cols)) -> rush_stats
 
 
+library(slider)
 # Calculate cumulative sums of stats endured so far
 rush_stats |> 
-  group_by(player_id) |> 
   left_join(rb_injuries,by = c('season','player_id' = 'gsis_id')) |> 
   replace_na(list(weeks_missed = 0)) |> 
+  group_by(player_id) |> 
   # Compute 1 year lag of all numeric columns
   mutate(across(where(is.numeric), ~lag(.), .names = "{.col}_lag1"),
          # Cumulative sum of injuries
          weeks_inj = lag(cumsum(weeks_missed)),
          across(stat_cols, ~lag(cumsum(.)), .names = "{.col}_career_sum"),
-         across(stat_cols, ~lag(weighted_sum(.)), .names = "{.col}_wt_sum")) -> agg_stats
+         across(stat_cols, ~lag(weighted_sum(.)), .names = "{.col}_wt_sum")) |> 
+  # Take lag so we are not leaking data
+  mutate(
+    across(stat_cols, ~ lag(slide_dbl(.x,.f = weighted_avg,.before = Inf,.complete = TRUE)),.names = "wt_{col}"))-> agg_stats
   
+agg_stats |> 
+  #select(starts_with("wt_"),ends_with("_wt_sum")) |> 
+  select(player_name,season,,carries,wt_carries,carries_wt_sum) |> 
+  filter(!is.na(player_name))
 ```
 
 
@@ -191,6 +216,8 @@ splits <- rsample::initial_split(model_data, prop = 0.8)
 rb_train <- rsample::training(splits)
 rb_test <- rsample::testing(splits)
 ```
+
+
 
 
 Create recipes (eventually we will compare).
