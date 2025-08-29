@@ -98,15 +98,11 @@ rush_stats |>
          # Cumulative sum of injuries
          weeks_inj = lag(cumsum(weeks_missed)),
          across(stat_cols, ~lag(cumsum(.)), .names = "{.col}_career_sum"),
-         across(stat_cols, ~lag(weighted_sum(.)), .names = "{.col}_wt_sum")) |> 
+         #across(stat_cols, ~lag(weighted_sum(.)), .names = "{.col}_wt_sum")) |> 
   # Take lag so we are not leaking data
-  mutate(
-    across(stat_cols, ~ lag(slide_dbl(.x,.f = weighted_avg,.before = Inf,.complete = TRUE)),.names = "wt_{col}"))-> agg_stats
   
-agg_stats |> 
-  #select(starts_with("wt_"),ends_with("_wt_sum")) |> 
-  select(player_name,season,,carries,wt_carries,carries_wt_sum) |> 
-  filter(!is.na(player_name))
+    across(stat_cols, ~ lag(slide_dbl(.x,.f = weighted_avg,.before = Inf,.complete = TRUE)),.names = "{.col}_wt_sum"))-> agg_stats
+  
 ```
 
 
@@ -495,45 +491,6 @@ gratia::draw(gam_model)
 
 
 
-```{r}
-# Create cross-validation folds
-rb_folds <- vfold_cv(rb_train, v = 5, strata = age)
-
-# Define preprocessing recipes
-# Recipe 1: Basic preprocessing
-basic_recipe <- recipe(carries ~ ., data = rb_train) |>
-  step_normalize(all_numeric_predictors()) |>
-  step_corr(all_numeric_predictors(), threshold = 0.9)
-
-# Recipe 2: More complex preprocessing with polynomial terms
-poly_recipe <- recipe(mpg ~ ., data = rb_train) |>
-  step_normalize(all_numeric_predictors()) |>
-  step_poly(hp, wt, degree = 2) |>
-  step_corr(all_numeric_predictors(), threshold = 0.9)
-
-# Recipe 3: PCA preprocessing
-pca_recipe <- recipe(mpg ~ ., data = rb_train) |>
-  step_normalize(all_numeric_predictors()) |>
-  step_pca(all_numeric_predictors(), threshold = 0.95)
-
-# Define model specifications
-# Linear regression
-lm_spec <- linear_reg() |>
-  set_engine("lm")
-
-# Random Forest
-rf_spec <- rand_forest(
-  mtry = tune(),
-  trees = 1000,
-  min_n = tune()
-) |>
-  set_engine("ranger") |>
-  set_mode("regression")
-
-```
-
-
-
 
 ### Missingness
 
@@ -591,13 +548,44 @@ Using carries as a proxy for success. We run into the following problem as expla
 
 ```{r}
 model_data |> 
-  group_by(age = round(approx_age)) |> 
-  summarise(avg_carries = mean(carries,na.rm = T)) |> 
+  group_by(age = age) |> 
+  #summarise(avg_carries = mean(carries,na.rm = T)) |> 
   ungroup() |> 
-  ggplot(aes(x = age,y=avg_carries))+
-  geom_smooth()
+  ggplot(aes(x = age,y=touches))+
+  geom_point()
+
+# Measure the changes year-to-year of w/ RBs having at least 50 touches
+# trailing_df = model_data 
+
+model_data |> 
+  filter(touches >= 50) |> 
+  select(player_id,age,touches) |>
+  mutate(next_age = age +1) -> minus1
+
+minus1
+  
+minus1 |> 
+  inner_join(minus1,by = c("player_id", "next_age" = "age"),suffix = c(".current",".next")) |> 
+  mutate(diff.touches = touches.next - touches.current) |> 
+  select(player_id,age,next_age,diff.touches) -> age_diffs
+
+age_diffs
+
+age_diffs |> 
+  group_by(age,next_age) |> 
+  summarise(avg_diff = mean(diff.touches),n = n()) |> 
+  ungroup() |> 
+  # Arbitrary cutoff (20 players)
+  filter(n >= 20) |> 
+  ggplot(aes(x = next_age,y = avg_diff)) + 
+  geom_point() + 
+  geom_smooth(se = F) + 
+  labs(title = "Delta Method", x = "Age", y = "Avg. Change in Total Touches")
 ```
 Interesting, is it reasonable to expect an upward trajectory the entire way? Perhaps early on in their careers, but I hardly expect them to reach their peak at age 37! This is probably due to a cognitive bias called *survivorship bias*. It's when our sample mistakenly represents only the "success" of population rather than the entire population.
+
+
+We'll instead apply this to our predictions. Adjusting the predicted outputs by the corresponding value in our delta method dataset.
 
 
 
