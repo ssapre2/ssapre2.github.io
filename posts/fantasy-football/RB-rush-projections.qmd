@@ -18,24 +18,6 @@ While it's certainly proven riskier to spend resources on runnings there still h
 ```{r}
 # Create Time Weighting 
 
-weighted_sum = function(x,alpha=1){
-  
-  # Take in sliding window of vector of chosen metric
-
-  n <- length(x)
-  w_sum = sapply(1:n, function(i) {
-    weights <- alpha^((i - 1):0)  # Most recent gets highest weight (alpha^0 = 1)
-    values <- x[1:i]
-    weighted_sum <- sum(values * weights, na.rm = FALSE) / sum(weights)
-    return(weighted_sum)
-  })
-  
-  return(w_sum)
-  
-}
-
-# Create Time Weighting 
-
 weighted_avg = function(metric_vector){
   
   # Take in sliding window of vector of chosen metric
@@ -53,7 +35,18 @@ weighted_avg = function(metric_vector){
 ```
 
 
-We'll load our relevnat data in this section. Hypothesizing which types of stats could be the biggest influencers of running back carries, we'll break things down into previous success, injuries, and monetary commitment.
+
+```{r}
+#| eval: false
+#| include: false
+
+weighted_avg(c(200,175,300))
+
+```
+
+
+
+We'll load our relevant data in this section. Hypothesizing which types of stats could be the biggest influencers of running back carries, we'll break things down into previous success, injuries, and monetary commitment.
 
 ```{r}
 library(nflreadr)
@@ -134,8 +127,6 @@ player_rosters |>
   arrange(desc(season)) |> 
   select(gsis_id,season,years_exp,height,weight,age,draft_number)-> rb_roster_info
 
-rb_roster_info |> 
-  filter(gsis_id == "00-0032780")
 ```
 
 
@@ -191,16 +182,20 @@ agg_stats |>
   filter(season >= 2009) |> 
   # Create a new target: "Total Touches"
   mutate(touches = carries + receptions) |> 
+  #relocate(touches) |> 
   arrange(desc(season)) |> 
   # Select relevant columns for modeling
-  select(1:4,ends_with("_sum"),ends_with("_lag1"),"touches",36:44,-c(apy))-> model_data
+  select(1:4,ends_with("_sum"),ends_with("_lag1"),"touches",36:44,-c(apy)) -> full_data
 
-# Select base
+
+# We want to hold out the most recent season's data to visualize
+full_data |> 
+  filter(season < max(full_data$season)) -> model_data
 
 ```
 
 
-### Data Splitting
+## Data Splitting
 
 Before we start with any analysis, we should start with our preprocessing steps so we're not leaking any information to a model.
 
@@ -214,22 +209,72 @@ rb_test <- rsample::testing(splits)
 ```
 
 
+### Delta Method
+
+We want to visualize the average change, from one age to the next, of the number of touches.
 
 
-Create recipes (eventually we will compare).
+```{r}
+# Measure the changes year-to-year of w/ RBs having at least 50 touches
+# trailing_df = model_data 
+
+rb_train |> 
+  group_by(player_id) |> 
+  mutate(career_touches = sum(touches,na.rm = T)) |> 
+  # Minimum 400 career touches
+  filter(career_touches >= 400) |> 
+  select(player_id,age,touches) |>
+  mutate(last_age = age - 1) |> 
+  arrange(age) |> 
+  group_by(player_id) |>
+  mutate(last_touches = lag(touches,1),
+         delta = touches-last_touches) |> 
+  ungroup()-> age_diffs
+
+age_diffs |> 
+  group_by(age,last_age) |> 
+  summarise(avg_diff = mean(delta,na.rm = T),n = n()) |> 
+  ungroup() |> 
+  # Arbitrary cutoff (min 10 players of data per age group)
+  filter(n >= 10) -> delta_df
+
+delta_df |> 
+  ggplot(aes(x = age,y = avg_diff)) + 
+  geom_point() + 
+  geom_smooth(se = F,span = .5) + 
+  labs(title = "Delta Method", x = "Age", y = "Avg. Change in Total Touches")
+```
+
+
+Ok, this looks more reasonable. Seems as though players peak at around 23 and experience a somewhat preicpitous decline thereafter. We'll use this to adjust our model predictions. Instead of including age in model predictions, we'll use the values from this curve.
+
+
+Interesting, is it reasonable to expect an upward trajectory the entire way? Perhaps early on in their careers, but I hardly expect them to reach their peak at age 37! This is probably due to a cognitive bias called *survivorship bias*. It's when our sample mistakenly represents only the "success" of population rather than the entire population.
+
+
+We'll instead apply this to our predictions. Adjusting the predicted outputs by the corresponding value in our delta method dataset.
+
+
+
+
+
+
+Create recipes (eventually we will compare). . In this step, I'll also add a feature selection/reduction process called Principal Component Analysis (abbrev. PCA). We won't get into the math on this post, but the high-level idea is that the `pca_recipe` introduces a step in which the feature space is transformed into a set of new features called "principal components" that capture as much of the linear relationships between variables as possible. Basically, combining many features into a smaller amount of features. It may not necessarily be needed since some of the algorithms already implement feature selection.
 
 ```{r}
 # Create cross-validation folds
 rb_folds <- vfold_cv(rb_train, v = 5)
 
-some_vars <- names(model_data)[5:ncol(model_data)]
+some_vars <- names(model_data)[1:5]
 
 # Define preprocessing recipes
 # Recipe 1: Basic preprocessing
 basic_recipe <- recipe(touches ~ ., data = rb_train) |> 
+  step_rm(all_of(some_vars)) |> 
+  #update_role(touches,new_role = "target") |> 
   update_role(season, new_role = "ID") |> 
   update_role(player_id, new_role = "ID") |> 
-  step_select(all_of(some_vars)) |> 
+  #step_select(all_of(some_vars)) |> 
   step_normalize(all_numeric_predictors()) |> 
   step_corr(all_numeric_predictors(), threshold = 0.9) |> 
   step_impute_median(apy_cap_pct) |> 
@@ -277,6 +322,10 @@ xgb_spec <- boost_tree(
 prep(basic_recipe)
 
 ```
+
+
+
+
 
 
 ```{r}
@@ -329,15 +378,12 @@ Okay, it looks like the random forrest regressor was the best at predicting new 
 # Visualize model performance
 autoplot(model_results, metric = "rmse") +
   theme_minimal() +
-  labs(title = "Model Performance Comparison",
-       subtitle = "Lower RMSE indicates better performance") +
+  labs(title = "Model Performance Comparison") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
 best_workflow_id <- model_rankings |> 
   slice_head(n = 1) |> 
   pull(wflow_id)
-
-model_rankings
 ```
 
 This autoplot gives us some added context to our tested model performance. While it looks like the tree-based models give us slightly better fit than the glms. It can be argued that the performance improvement of the random forest model doesn't justify the increased complexity and training time required. However, implementing that RF forest shouldn't be too difficult in practice. We'll stick with that.
@@ -359,9 +405,25 @@ final_workflow <- best_workflow |>
 
 # Fit the final model on training data and evaluate on test data
 final_fit <- final_workflow |> 
-  last_fit(splits)
+  fit(data = rb_train)
 
-final_workflow
+df.2024 = filter(full_data, season == max(full_data$season))
+#prepped_new_data = prep(basic_recipe,df.2024)
+#bake(prepped_new_data,new_data = NULL)
+preds <- augment(final_fit, new_data = rb_test)
+#inal_fit %>% extract_recipe() %>% tidy() -> df.recipe
+preds|> 
+  rmse(truth = touches,estimate = .pred)
+
+preds.24 = augment(final_fit,new_data = df.2024)
+
+preds.24 |> 
+  mutate(touches.lag1 = carries_lag1+targets_lag1) |> 
+  select(player_name,recent_team,season,touches,touches.lag1,.pred)
+  
+  #last_fit(splits)
+
+#final_workflow
 ```
 
 
@@ -480,7 +542,7 @@ When we say the model was "tinkered with" it just means we were checking signifi
 
 Now that we've finished the GAM model we can combine both datatsets and check what the results tell us.
 
-One of the core features of the GAM application, is the allowance of both linear and non-linear terms. In the output above, we can assume a linear relationship betweens between height and touches and season and touches.
+One of the core features of the GAM application, is the allowance of both linear and non-linear terms. In the output above, we can assume a linear relationship betweens between height and touches and season and touches.-
 
 
 ```{r}
@@ -492,100 +554,23 @@ gratia::draw(gam_model)
 
 
 
-### Missingness
-
-```{r}
-rb_train |> 
-  ungroup() |> 
-  miss_var_summary()
-```
-
-
-Seems as though there are a decent number of missing values for that apy contract value. 
-
-```{r}
-library(naniar)
-library(tidyr)
-
-model_data |>
-  nabular() |>
-  ggplot(aes(x = season,
-             y = carries,
-             fill = apy_cap_pct_NA)) + 
-  geom_col()
-
-# Draft Number
-model_data |>
-  nabular() |>
-  ggplot(aes(x = draft_number,
-             y = apy_cap_pct)) + 
-  geom_miss_point() +
-  facet_wrap(~season)
-
-
-```
-
-
-```{r}
-# impute
-gam(apy_cap_pct ~ s(fantasy_points_wt_sum) + s(draft_number) + s(years_exp) +
-     te(games_career_sum,age)+
-   +s(season_lag1)+
-     s(fantasy_points_wt_sum)+
-     s(weight)+
-     s(weeks_inj), 
-   data = rb_train,
-   method="REML",
-   select=TRUE)-> impute_cap_pct
-
-summary(impute_cap_pct)
-```
 
 ### Aging Curves
 
 
-Using carries as a proxy for success. We run into the following problem as explained by the graph below.
+Using touches as a proxy for success. We run into the following problem as explained by the graph below. Why doesn't this look very intuitive? To my eye, we are seeing that, on average, running back touches increase with age, even up through 35. This is misleading because they actually do not. This is an issue of survivorship bias. The top RBs in game tend to "survive" or play for longer periods of time and propping up the tail end of this graph. Since most players don't play that long, we have to adjust the way we visualize aging and account for that bias in our model.
 
 ```{r}
+#| message: false
+#| warning: false
 model_data |> 
   group_by(age = age) |> 
-  #summarise(avg_carries = mean(carries,na.rm = T)) |> 
+  summarise(avg_touches = mean(touches,na.rm = T)) |> 
   ungroup() |> 
-  ggplot(aes(x = age,y=touches))+
-  geom_point()
-
-# Measure the changes year-to-year of w/ RBs having at least 50 touches
-# trailing_df = model_data 
-
-model_data |> 
-  filter(touches >= 50) |> 
-  select(player_id,age,touches) |>
-  mutate(next_age = age +1) -> minus1
-
-minus1
-  
-minus1 |> 
-  inner_join(minus1,by = c("player_id", "next_age" = "age"),suffix = c(".current",".next")) |> 
-  mutate(diff.touches = touches.next - touches.current) |> 
-  select(player_id,age,next_age,diff.touches) -> age_diffs
-
-age_diffs
-
-age_diffs |> 
-  group_by(age,next_age) |> 
-  summarise(avg_diff = mean(diff.touches),n = n()) |> 
-  ungroup() |> 
-  # Arbitrary cutoff (20 players)
-  filter(n >= 20) |> 
-  ggplot(aes(x = next_age,y = avg_diff)) + 
+  ggplot(aes(x = age,y=avg_touches))+
   geom_point() + 
-  geom_smooth(se = F) + 
-  labs(title = "Delta Method", x = "Age", y = "Avg. Change in Total Touches")
+  geom_smooth(span = 0.5,se = F)
 ```
-Interesting, is it reasonable to expect an upward trajectory the entire way? Perhaps early on in their careers, but I hardly expect them to reach their peak at age 37! This is probably due to a cognitive bias called *survivorship bias*. It's when our sample mistakenly represents only the "success" of population rather than the entire population.
-
-
-We'll instead apply this to our predictions. Adjusting the predicted outputs by the corresponding value in our delta method dataset.
 
 
 
