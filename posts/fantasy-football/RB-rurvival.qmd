@@ -1,0 +1,109 @@
+---
+title: "Running Back in Style"
+format: html
+---
+
+Running Backs had their moment this past season. A recently maligned position group thought to provide little value to team production made a momentary sigh of relief. Leading the comeback story was Saquon Barkley's near record breaking campaign and Super Bowl run after being discarded by his former team and now division rival New York Giants. His monumental impact to the Eagles Super Bowl season did not go unnoticed as he was rewarded with a big [contract extention](https://www.espn.com/nfl/story/_/id/44124382/nfl-free-agency-2025-saquon-barkley-change-running-back-contracts-eagles) in March. He wasn't the only one rewarded with a new deal as Derrick Henry received a 2 year extentions following his recent debut season with the Ravens. Those players however aren't anomalies, as some exciting and dynamic stars such as Detroit's Jamyhr Gibbs and Atlanta's Bijan Robinson have both added to the strong case of the position group's value revival. It seems to have also convinced teams this season to invest more in the short dip in the RB market. 
+
+In this year's draft, 5 RBs were selected in the top 60 picks, 1 of which (Ashton Jeanty) was selected number 6. All of this leads me to believe that RB value is on the upswing. 
+
+
+For the past few years, the analytics has discussed at length, the value of each position driven by a desire to optimize where teams spend their resources (draft picks, money, etc.). The prevailing argument coming out of this research was that teams can be successful without investing heavily in position due to a variety of factors including teams adopting pass-heavy approaches, importance of offensive line play and impact, backfield by committee, and the contract values of running backs.
+
+I'm hoping to address the last 2 points in this post. The decline of a "workhorse" back and the increase in rush duties shared among multiple runnings and, at times, the QB. Teams have tended to rely slightly less on one RB for a number of reasons. One of the prime reasons was the hesitancy to put the that kind of load on the bodies of one player. Football is a violent game and taking hits has a toll. A recent run of talented RBs declining after signing massive contracts is a reason teams have been scared off of committing large amounts of resources recently. Players like Todd Gurley, Ezekiel Elliot, and Le'Veon Bell have all experienced precipotous decline and/or serious injuries after signing large long-term contracts.
+
+While it's certainly proven riskier to spend resources on runnings there still have been plenty of RBs who have continued to produce. Henry himself had a stellar season at age 30. Alvin Kamara, Christian, McCafferey, Josh Jacobs, and Barkley have all produced well after receiving long-term contracts. How can we predict whether the contract is worth it? Is there a way to tell how much proverbial gas is left in the tank for these guys. Let's find out...
+
+
+```{r}
+# Load packages
+library(nflreadr)
+library(tidyverse)
+library(lubridate)
+
+# 1. Load player stats and injury reports
+pbp <- load_player_stats(seasons = 2023)   # weekly stats
+inj <- load_injuries(seasons = 2023)       # weekly injury reports
+roster <- load_rosters(seasons = 2023)
+
+# 2. Filter for running backs
+rb_roster <- roster %>%
+  filter(position == "RB") %>%
+  select(gsis_id, full_name, age = birth_date) %>%
+  mutate(age = as.numeric((Sys.Date() - ymd(age)) / 365.25))
+
+rb_stats <- pbp %>%
+  filter(position == "RB") %>%
+  select(season, week, gsis_id = player_id,carries,rushing_yards)
+
+# 3. Create an event indicator
+# Suppose "event" = missed game due to injury
+rb_inj <- inj %>%
+  filter(position == "RB") %>%
+  mutate(event = if_else(report_status %in% c("Out", "Injured Reserve"), 1, 0)) %>%
+  select(season, week, gsis_id, event)
+
+# --- Create complete grid of (player, season, week) ---
+all_weeks <- expand_grid(
+  gsis_id = unique(rb_roster$gsis_id),
+  season = 2023,
+  week = 1:18
+)
+
+# --- Merge everything ---
+rb_long <- all_weeks %>%
+  left_join(rb_stats, by = c("gsis_id", "season", "week")) %>%
+  left_join(rb_inj,  by = c("gsis_id", "season", "week")) %>%
+  left_join(rb_roster, by = "gsis_id")%>%
+  arrange(gsis_id, week) %>%
+  mutate(
+    carries = replace_na(carries, 0),   # 0 carries if no stats
+    event = replace_na(event, 0)          # assume no injury unless reported
+  )
+
+# --- Stop weeks after first injury ---
+rb_surv <- rb_long %>%
+  group_by(gsis_id, season) %>%
+  mutate(
+    first_event_week = ifelse(any(event == 1),
+                              min(week[event == 1]), Inf)
+  ) %>%
+  filter(week <= first_event_week) %>%   # keep weeks only up to event
+  ungroup()
+
+
+```
+
+
+### Survival Models
+
+Here, we'll attempt to estimate the survival rate using a logistic regression. With the following algo as mentioned by Demetri Pananos
+
+Structure your data so that you have number at risk, number of events, and number of censoring events as columns
+Fit a logistic regression on the event/at risk columns (in R this is done by making cbind(y, n-y) the outcome in the glm call). Ensure the time variable is modeled flexibly (either with splines or something more exotic).
+Predict the risk of death (i.e. the discrete hazard) from the logistic regression on the observed event times.
+Take the cumulative product of one minus the discrete hazards. These are the survival function estimates.
+
+```{r}
+library(survival)
+
+surv_obj <- Surv(time = rb_surv$week, event = rb_surv$event)
+fit <- survfit(surv_obj ~ 1)
+
+sfit_tidy <- broom::tidy(fit)
+
+sfit_tidy
+```
+
+
+
+
+Ok, this looks more reasonable. Seems as though players peak at around 23 and experience a somewhat preicpitous decline thereafter. We'll use this to adjust our model predictions. Instead of including age in model predictions, we'll use the values from this curve.
+
+
+Interesting, is it reasonable to expect an upward trajectory the entire way? Perhaps early on in their careers, but I hardly expect them to reach their peak at age 37! This is probably due to a cognitive bias called *survivorship bias*. It's when our sample mistakenly represents only the "success" of population rather than the entire population.
+
+
+We'll instead apply this to our predictions. Adjusting the predicted outputs by the corresponding value in our delta method dataset.
+
+

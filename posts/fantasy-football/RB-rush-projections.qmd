@@ -16,6 +16,81 @@ While it's certainly proven riskier to spend resources on runnings there still h
 
 
 ```{r}
+# Load packages
+library(nflreadr)
+library(tidyverse)
+library(lubridate)
+
+# 1. Load player stats and injury reports
+pbp <- load_player_stats(seasons = 2023)   # weekly stats
+inj <- load_injuries(seasons = 2023)       # weekly injury reports
+roster <- load_rosters(seasons = 2023)
+
+# 2. Filter for running backs
+rb_roster <- roster %>%
+  filter(position == "RB") %>%
+  select(gsis_id, full_name, age = birth_date) %>%
+  mutate(age = as.numeric((Sys.Date() - ymd(age)) / 365.25))
+
+rb_stats <- pbp %>%
+  filter(position == "RB") %>%
+  select(season, week, gsis_id = player_id,carries,rushing_yards)
+
+# 3. Create an event indicator
+# Suppose "event" = missed game due to injury
+rb_inj <- inj %>%
+  filter(position == "RB") %>%
+  mutate(event = if_else(report_status %in% c("Out", "Injured Reserve"), 1, 0)) %>%
+  select(season, week, gsis_id, event)
+
+# --- Create complete grid of (player, season, week) ---
+all_weeks <- expand_grid(
+  gsis_id = unique(rb_roster$gsis_id),
+  season = 2023,
+  week = 1:18
+)
+
+# --- Merge everything ---
+rb_long <- all_weeks %>%
+  left_join(rb_stats, by = c("gsis_id", "season", "week")) %>%
+  left_join(rb_inj,  by = c("gsis_id", "season", "week")) %>%
+  left_join(rb_roster, by = "gsis_id")%>%
+  arrange(gsis_id, week) %>%
+  mutate(
+    carries = replace_na(carries, 0),   # 0 carries if no stats
+    event = replace_na(event, 0)          # assume no injury unless reported
+  )
+
+# 4. Merge and create time-to-event structure
+rb_data <- rb_stats %>%
+  left_join(rb_inj, by = c("season", "week", "gsis_id")) %>%
+  group_by(gsis_id, season) %>%
+  arrange(week) %>%
+  mutate(
+    time = row_number(),              # time = weeks played
+    event = coalesce(event, 0)        # 0 if no injury report
+  ) |>
+  arrange(desc(event))
+
+
+%>%
+  group_by(gsis_id, season) %>%
+  summarize(
+    time = max(time),                 # total exposure weeks
+    event = max(event),               # 1 if injured at some point
+    carries = sum(attempts, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  left_join(rb_roster, by = "gsis_id")
+
+# Final dataset
+rb_data %>% head()
+
+```
+
+
+
+```{r}
 # Create Time Weighting 
 
 weighted_avg = function(metric_vector){
