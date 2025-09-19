@@ -255,6 +255,42 @@ Interesting, is it reasonable to expect an upward trajectory the entire way? Per
 We'll instead apply this to our predictions. Adjusting the predicted outputs by the corresponding value in our delta method dataset.
 
 
+#### Create Recipe Step for Aging
+
+For ML pipeline
+
+```{r}
+step_aging_curve <- function(recipe, ..., role = NA, trained = FALSE,
+                             age_col = NULL, adjustment = NULL, skip = FALSE,
+                             id = rand_id("aging_curve")) {
+  add_step(
+    recipe,
+    step_aging_curve_new(
+      terms = enquos(...),
+      role = role,
+      trained = trained,
+      age_col = age_col,
+      adjustment = adjustment,
+      skip = skip,
+      id = id
+    )
+  )
+}
+
+step_aging_curve_new <- function(terms, role, trained, age_col, adjustment, skip, id) {
+  step(
+    subclass = "aging_curve",
+    terms = terms,
+    role = role,
+    trained = trained,
+    age_col = age_col,
+    adjustment = adjustment,
+    skip = skip,
+    id = id
+  )
+}
+
+```
 
 
 
